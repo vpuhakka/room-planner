@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="omelette-owns-print" content="1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; background: #e9e2d4; }
+  body { font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #2c2a26; -webkit-font-smoothing: antialiased; }
+  a { color: #17635e; }
+  a:hover { color: #2c2a26; }
+  * { box-sizing: border-box; }
+  button, input, select { font-family: inherit; }
+  [data-printonly] { display: none; }
+  @media print {
+    @page { margin: 14mm; }
+    [data-noprint] { display: none !important; }
+    [data-app] { height: auto !important; overflow: visible !important; display: block !important; background: #fdfbf6 !important; }
+    [data-cols] { display: block !important; }
+    [data-stagewrap] { overflow: visible !important; height: 620px !important; background: #fdfbf6 !important; border: none !important; }
+    [data-printonly] { display: block !important; }
+  }
+</style>
+</helmet>
+
+<div data-app style="height: 100vh; overflow: hidden; display: flex; flex-direction: column; background: #e9e2d4;">
+
+  <header data-noprint style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 14px; background: #ded6c5; border-bottom: 1.5px solid #57514a;">
+    <h1 style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; line-height: 1.1; margin: 0; color: #2c2a26;">Room plan</h1>
+    <select value="{{ homeId }}" onChange="{{ onPickHome }}" style="height: 28px; padding: 0 6px; font-size: 12px; font-weight: 600; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px; max-width: 170px;">
+      <sc-for list="{{ homeOpts }}" as="h" hint-placeholder-count="1">
+        <option value="{{ h.id }}">{{ h.name }}</option>
+      </sc-for>
+    </select>
+    <div onClick="{{ onRoomClick }}" style="display: flex; gap: 4px; flex-wrap: wrap;">
+      <sc-for list="{{ roomTabs }}" as="t" hint-placeholder-count="2">
+        <button type="button" data-room="{{ t.i }}" style="{{ t.style }}">{{ t.name }}</button>
+      </sc-for>
+      <button onClick="{{ onAddRoom }}" style="height: 28px; padding: 0 9px; font-size: 15px; line-height: 1; color: #615a4d; background: transparent; border: 1px dashed #b3a893; border-radius: 5px; cursor: pointer;" style-hover="color: #2c2a26; border-color: #57514a;" title="Add a room">+</button>
+    </div>
+    <div style="flex: 1; min-width: 10px;"></div>
+    <div style="display: flex; gap: 4px; align-items: center;">
+      <button onClick="{{ onUndo }}" style="{{ undoStyle }}" title="Undo (⌘Z)">Undo</button>
+      <button onClick="{{ onRedo }}" style="{{ redoStyle }}" title="Redo (⇧⌘Z)">Redo</button>
+      <button onClick="{{ onShare }}" style="height: 28px; padding: 0 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #fdfbf6; background: #2c2a26; border: 1px solid #2c2a26; border-radius: 5px; cursor: pointer;" style-hover="background: #57514a;">{{ shareLabel }}</button>
+      <button onClick="{{ onPrint }}" style="height: 28px; padding: 0 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px; cursor: pointer;" style-hover="background: #e1d9c9;">Print</button>
+    </div>
+  </header>
+
+  <div data-cols style="flex: 1; min-height: 0; display: grid; grid-template-columns: 228px minmax(0, 1fr) 252px; align-items: stretch;">
+
+    <aside data-noprint style="padding: 12px 12px 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; overflow-y: auto; background: #f5f1e7; border-right: 1px solid #57514a;">
+
+      <section style="display: flex; flex-direction: column; gap: 6px;">
+        <h2 style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #615a4d;">Room</h2>
+        <input value="{{ roomName }}" onChange="{{ onRoomName }}" style="height: 30px; padding: 0 7px; font-size: 13px; font-weight: 600; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+          <label style="display: flex; flex-direction: column; gap: 2px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #615a4d;">Width cm
+            <input type="number" step="10" value="{{ roomW }}" onChange="{{ onRoomW }}" style="width: 100%; height: 28px; padding: 0 7px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px; min-width: 0;">
+          </label>
+          <label style="display: flex; flex-direction: column; gap: 2px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #615a4d;">Depth cm
+            <input type="number" step="10" value="{{ roomD }}" onChange="{{ onRoomD }}" style="width: 100%; height: 28px; padding: 0 7px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px; min-width: 0;">
+          </label>
+        </div>
+        <div style="display: flex; gap: 5px;">
+          <input value="{{ homeName }}" onChange="{{ onHomeName }}" style="flex: 1; height: 28px; padding: 0 7px; font-size: 12px; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px; min-width: 0;" title="Name of this home or project">
+          <button onClick="{{ onAddHome }}" style="height: 28px; padding: 0 8px; font-size: 11px; font-weight: 600; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px; cursor: pointer;" style-hover="border-color: #57514a;">New home</button>
+        </div>
+        <button onClick="{{ onDelRoom }}" style="height: 26px; font-size: 11px; font-weight: 500; color: #615a4d; background: transparent; border: 1px solid #e4dccd; border-radius: 5px; cursor: pointer;" style-hover="color: #b03a2b; border-color: #b03a2b;">Delete this room</button>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 6px;">
+        <h2 style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #615a4d;">Shape</h2>
+        <p style="margin: 0; font-size: 11px; line-height: 1.4; color: #615a4d;">Cut a corner to make an L-shape or leave an alcove.</p>
+        <sc-for list="{{ corners }}" as="c" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: 54px 1fr 1fr 24px; gap: 4px; align-items: center;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: #2c2a26;">{{ c.label }}</span>
+            <input type="number" step="10" placeholder="w" value="{{ c.w }}" onChange="{{ c.onW }}" style="height: 26px; padding: 0 5px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px; min-width: 0;">
+            <input type="number" step="10" placeholder="d" value="{{ c.d }}" onChange="{{ c.onD }}" style="height: 26px; padding: 0 5px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px; min-width: 0;">
+            <button onClick="{{ c.onClear }}" style="height: 26px; font-size: 12px; color: #615a4d; background: transparent; border: 1px solid #e4dccd; border-radius: 5px; cursor: pointer;" style-hover="color: #2c2a26; border-color: #57514a;" title="Clear">×</button>
+          </div>
+        </sc-for>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <h2 style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #615a4d;">Furniture</h2>
+          <div style="flex: 1;"></div>
+          <button onClick="{{ onToggleEdit }}" style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #17635e; background: transparent; border: none; padding: 0; cursor: pointer;" style-hover="color: #2c2a26;">{{ editLabel }}</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <sc-for list="{{ catalog }}" as="c" hint-placeholder-count="6">
+            <div style="display: flex; gap: 3px; align-items: stretch;">
+              <button onClick="{{ c.onAdd }}" style="{{ c.style }}">
+                <span style="{{ c.swatch }}"></span>
+                <span style="font-size: 12px; font-weight: 500;">{{ c.name }}</span>
+                <span style="flex: 1;"></span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #615a4d;">{{ c.dims }}</span>
+              </button>
+              <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ c.onDel }}" style="width: 24px; font-size: 12px; color: #615a4d; background: transparent; border: 1px solid #e4dccd; border-radius: 5px; cursor: pointer;" style-hover="color: #b03a2b; border-color: #b03a2b;">×</button>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ editing }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 4px; padding: 8px; background: #efe9db; border: 1px dashed #b3a893; border-radius: 5px;">
+            <input placeholder="New piece name" value="{{ catName }}" onChange="{{ onCatName }}" style="height: 28px; padding: 0 7px; font-size: 12px; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+              <input type="number" placeholder="w" value="{{ catW }}" onChange="{{ onCatW }}" style="height: 28px; padding: 0 7px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px; min-width: 0;">
+              <input type="number" placeholder="d" value="{{ catD }}" onChange="{{ onCatD }}" style="height: 28px; padding: 0 7px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px; min-width: 0;">
+            </div>
+            <select value="{{ catCat }}" onChange="{{ onCatCat }}" style="height: 28px; padding: 0 5px; font-size: 12px; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px;">
+              <option value="sleep">Sleeping</option>
+              <option value="storage">Storage</option>
+              <option value="work">Work and seating</option>
+              <option value="soft">Soft, rugs</option>
+              <option value="other">Other</option>
+            </select>
+            <button onClick="{{ onCatAdd }}" style="height: 30px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #fdfbf6; background: #2c2a26; border: none; border-radius: 5px; cursor: pointer;" style-hover="background: #57514a;">Save to catalogue</button>
+          </div>
+        </sc-if>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 6px;">
+        <h2 style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #615a4d;">Openings</h2>
+        <div style="display: flex; gap: 5px;">
+          <button onClick="{{ onAddDoor }}" style="flex: 1; height: 30px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px; cursor: pointer;" style-hover="background: #e1d9c9;">Door</button>
+          <button onClick="{{ onAddWindow }}" style="flex: 1; height: 30px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px; cursor: pointer;" style-hover="background: #e1d9c9;">Window</button>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 6px;">
+        <h2 style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #615a4d;">Plan file</h2>
+        <button onClick="{{ onExport }}" style="height: 28px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px; cursor: pointer;" style-hover="background: #e1d9c9;">Export .json</button>
+        <label style="display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #615a4d;">Import a plan file
+          <input type="file" accept="application/json,.json" onChange="{{ onImport }}" style="font-size: 11px; color: #615a4d;">
+        </label>
+        <p style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 10px; line-height: 1.5; color: #615a4d;">{{ savedNote }}</p>
+      </section>
+
+    </aside>
+
+    <main style="padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; overflow: hidden; background: #e9e2d4;">
+
+      <div data-noprint style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #615a4d;">Layout</span>
+        <div style="display: flex; gap: 3px;">
+          <button onClick="{{ onSlotA }}" style="{{ slotA }}">A</button>
+          <button onClick="{{ onSlotB }}" style="{{ slotB }}">B</button>
+          <button onClick="{{ onSlotC }}" style="{{ slotC }}">C</button>
+        </div>
+        <button onClick="{{ onCopyHere }}" style="height: 28px; padding: 0 10px; font-size: 11px; font-weight: 600; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px; cursor: pointer;" style-hover="border-color: #57514a;">Copy to next</button>
+        <button onClick="{{ onReset }}" style="height: 28px; padding: 0 10px; font-size: 11px; font-weight: 600; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px; cursor: pointer;" style-hover="border-color: #57514a;">Empty</button>
+        <div style="flex: 1;"></div>
+        <div style="display: flex; align-items: center; gap: 3px;">
+          <button onClick="{{ onZoomOut }}" style="width: 26px; height: 26px; font-size: 14px; line-height: 1; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px; cursor: pointer;" style-hover="border-color: #57514a;">−</button>
+          <span style="min-width: 44px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; color: #615a4d;">{{ zoomText }}</span>
+          <button onClick="{{ onZoomIn }}" style="width: 26px; height: 26px; font-size: 14px; line-height: 1; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px; cursor: pointer;" style-hover="border-color: #57514a;">+</button>
+          <button onClick="{{ onFit }}" style="height: 26px; padding: 0 9px; font-size: 11px; font-weight: 600; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px; cursor: pointer;" style-hover="background: #e1d9c9;">Fit</button>
+        </div>
+      </div>
+
+      <div data-printonly style="margin-bottom: 10px;">
+        <p style="margin: 0; font-size: 14px; font-weight: 600;">{{ printTitle }}</p>
+        <p style="margin: 2px 0 0; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #615a4d;">{{ printMeta }}</p>
+      </div>
+
+      <div data-stagewrap onPointerDown="{{ onCanvasDown }}" style="flex: 1; min-height: 0; position: relative; overflow: hidden; touch-action: none; cursor: default; background: #e1d9c9; border: 1px solid #d9d0bf;">
+        <div style="{{ stageStyle }}">
+          <div style="{{ roomStyle }}">
+            <div style="{{ gridStyle }}"></div>
+            <sc-for list="{{ swings }}" as="s" hint-placeholder-count="1">
+              <div style="{{ s.style }}"></div>
+            </sc-for>
+            <sc-for list="{{ items }}" as="it" hint-placeholder-count="3">
+              <div onPointerDown="{{ it.onDown }}" style="{{ it.style }}">
+                <span style="{{ it.labelStyle }}">{{ it.name }}</span>
+                <span style="{{ it.dimStyle }}">{{ it.dims }}</span>
+              </div>
+            </sc-for>
+            <sc-for list="{{ openings }}" as="o" hint-placeholder-count="2">
+              <div onPointerDown="{{ o.onDown }}" title="{{ o.title }}" style="{{ o.style }}"></div>
+            </sc-for>
+            <sc-for list="{{ cutBlocks }}" as="c" hint-placeholder-count="0">
+              <div style="{{ c.style }}"></div>
+            </sc-for>
+            <div style="{{ wLabelStyle }}">{{ wLabel }}</div>
+            <div style="{{ dLabelStyle }}">{{ dLabel }}</div>
+          </div>
+        </div>
+      </div>
+
+      <p data-noprint style="margin: 0; font-size: 11px; line-height: 1.5; color: #615a4d;">Drag pieces, or drag empty space to pan. Scroll to zoom. Alt ignores wall snapping. Arrows nudge 5 cm, R rotates, Backspace removes, ⌘Z undoes.</p>
+
+    </main>
+
+    <aside style="padding: 12px 12px 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; overflow-y: auto; background: #f5f1e7; border-left: 1px solid #57514a;">
+
+      <section data-noprint style="display: flex; flex-direction: column; gap: 8px;">
+        <h2 style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #615a4d;">Selected</h2>
+
+        <sc-if value="{{ selIsItem }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <input value="{{ selName }}" onChange="{{ onSelName }}" style="height: 32px; padding: 0 7px; font-size: 14px; font-weight: 600; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+              <label style="display: flex; flex-direction: column; gap: 2px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #615a4d;">Width
+                <input type="number" step="5" value="{{ selW }}" onChange="{{ onSelW }}" style="height: 28px; padding: 0 7px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px; min-width: 0;">
+              </label>
+              <label style="display: flex; flex-direction: column; gap: 2px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #615a4d;">Depth
+                <input type="number" step="5" value="{{ selD }}" onChange="{{ onSelD }}" style="height: 28px; padding: 0 7px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px; min-width: 0;">
+              </label>
+            </div>
+            <div style="display: flex; gap: 5px;">
+              <button onClick="{{ onRotate }}" style="flex: 1; height: 30px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px; cursor: pointer;" style-hover="background: #e1d9c9;">Rotate 90°</button>
+              <button onClick="{{ onDelete }}" style="height: 30px; padding: 0 11px; font-size: 11px; font-weight: 600; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px; cursor: pointer;" style-hover="color: #b03a2b; border-color: #b03a2b;">Remove</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ selIsOpening }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <p style="margin: 0; font-size: 14px; font-weight: 600; line-height: 1.3;">{{ selName }}</p>
+            <div style="display: flex; flex-direction: column; gap: 2px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #615a4d;">Wall
+              <div onClick="{{ onWallClick }}" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px;">
+                <button type="button" data-wall="n" style="{{ wallN }}">Top</button>
+                <button type="button" data-wall="e" style="{{ wallE }}">Right</button>
+                <button type="button" data-wall="s" style="{{ wallS }}">Bottom</button>
+                <button type="button" data-wall="w" style="{{ wallW }}">Left</button>
+              </div>
+            </div>
+            <label style="display: flex; flex-direction: column; gap: 2px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #615a4d;">Opening width, cm
+              <input type="number" step="5" value="{{ selLen }}" onChange="{{ onSelLen }}" style="height: 28px; padding: 0 7px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px;">
+            </label>
+            <sc-if value="{{ selIsDoor }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ onFlipDoor }}" style="height: 30px; width: 100%; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #2c2a26; background: #fdfbf6; border: 1px solid #57514a; border-radius: 5px; cursor: pointer;" style-hover="background: #e1d9c9;">Flip hinge side</button>
+            </sc-if>
+            <button onClick="{{ onDelete }}" style="height: 30px; font-size: 11px; font-weight: 600; color: #2c2a26; background: #fdfbf6; border: 1px solid #d9d0bf; border-radius: 5px; cursor: pointer;" style-hover="color: #b03a2b; border-color: #b03a2b;">Remove</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ noSel }}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; font-size: 12px; line-height: 1.45; color: #615a4d;">Click anything in the plan to size, rotate or move it.</p>
+        </sc-if>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 5px;">
+        <h2 style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #615a4d;">Checks</h2>
+        <sc-for list="{{ issues }}" as="i" hint-placeholder-count="0">
+          <button onClick="{{ i.onClick }}" style="{{ i.style }}">
+            <span style="{{ i.dot }}"></span>
+            <span style="font-size: 11px; line-height: 1.4; text-align: left;">{{ i.text }}</span>
+          </button>
+        </sc-for>
+        <sc-if value="{{ clean }}" hint-placeholder-val="{{ true }}">
+          <p style="margin: 0; font-size: 11px; line-height: 1.45; color: #615a4d;">Nothing overlaps, the door swings free and walkways are at least {{ walkway }} cm.</p>
+        </sc-if>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 4px;">
+        <h2 style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #615a4d;">In the room</h2>
+        <sc-for list="{{ list }}" as="l" hint-placeholder-count="3">
+          <button onClick="{{ l.onClick }}" style="{{ l.style }}">
+            <span style="font-size: 12px; font-weight: 500;">{{ l.name }}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #615a4d;">{{ l.dims }}</span>
+          </button>
+        </sc-for>
+        <p style="margin: 4px 0 0; font-family: 'IBM Plex Mono', monospace; font-size: 10px; line-height: 1.5; color: #615a4d;">Floor {{ areaText }} · furniture covers {{ fillText }}</p>
+      </section>
+
+    </aside>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showGrid&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Plan&quot;},&quot;gridCm&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:50,&quot;options&quot;:[10,25,50,100],&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Plan&quot;},&quot;showDims&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Plan&quot;},&quot;typeFills&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Plan&quot;},&quot;walkwayCm&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:60,&quot;min&quot;:40,&quot;max&quot;:120,&quot;step&quot;:5,&quot;unit&quot;:&quot;cm&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Checks&quot;}}">
+const KEY = "room-planner-doc-v1";
+const INK = "#2c2a26", LINE = "#57514a", EDGE = "#d9d0bf", SOFT = "#e4dccd";
+const MUTE = "#615a4d", ACC = "#17635e", ACCL = "#dae8e4";
+const BAD = "#b03a2b", NOTE = "#96671b", MONO = "'IBM Plex Mono', monospace";
+
+const CATS = {
+  sleep: { label: "Sleeping", fill: "#e2e6da", ink: "#4e5a49" },
+  storage: { label: "Storage", fill: "#e9e2d4", ink: "#6b6151" },
+  work: { label: "Work", fill: "#f1e3cb", ink: "#8a6a26" },
+  soft: { label: "Soft", fill: "#fdfbf6", ink: "#b3a893" },
+  other: { label: "Other", fill: "#f0ebdf", ink: "#615a4d" }
+};
+
+const BASE_CATALOG = [
+  { id: "bed", name: "Double bed", w: 200, d: 180, cat: "sleep" },
+  { id: "single", name: "Single bed", w: 200, d: 90, cat: "sleep" },
+  { id: "desk", name: "Desk", w: 125, d: 75, cat: "work" },
+  { id: "chair", name: "Chair", w: 45, d: 45, cat: "work" },
+  { id: "closet", name: "Closet", w: 200, d: 70, cat: "storage" },
+  { id: "wardrobe", name: "Wardrobe", w: 120, d: 60, cat: "storage" },
+  { id: "drawers", name: "Drawers", w: 80, d: 45, cat: "storage" },
+  { id: "nightstand", name: "Nightstand", w: 45, d: 40, cat: "storage" },
+  { id: "shelf", name: "Bookshelf", w: 80, d: 30, cat: "storage" },
+  { id: "rug", name: "Rug", w: 160, d: 230, cat: "soft" }
+];
+
+function defaultDoc() {
+  return {
+    nextHome: 2, nextRoom: 3,
+    catalog: BASE_CATALOG.map(c => Object.assign({}, c)),
+    homes: [{
+      id: 1, name: "Home", rooms: [
+        {
+          id: 1, name: "Bedroom 1", w: 310, d: 360, cuts: {}, nextId: 4, nextOid: 103,
+          slots: {
+            A: [
+              { id: 1, name: "Double bed", w: 200, d: 180, x: 155, y: 90, r: 0, cat: "sleep" },
+              { id: 2, name: "Closet", w: 200, d: 70, x: 210, y: 325, r: 0, cat: "storage" },
+              { id: 3, name: "Desk", w: 125, d: 75, x: 65, y: 218, r: 0, cat: "work" }
+            ], B: [], C: []
+          },
+          openings: [
+            { id: 101, kind: "Door", wall: "s", pos: 20, len: 90 },
+            { id: 102, kind: "Window", wall: "n", pos: 95, len: 130 }
+          ]
+        },
+        {
+          id: 2, name: "Bedroom 2", w: 380, d: 257, cuts: {}, nextId: 4, nextOid: 103,
+          slots: {
+            A: [
+              { id: 1, name: "Double bed", w: 200, d: 180, x: 210, y: 90, r: 0, cat: "sleep" },
+              { id: 2, name: "Closet", w: 200, d: 70, x: 345, y: 157, r: 90, cat: "storage" },
+              { id: 3, name: "Desk", w: 125, d: 75, x: 75, y: 219, r: 0, cat: "work" }
+            ], B: [], C: []
+          },
+          openings: [
+            { id: 101, kind: "Door", wall: "w", pos: 20, len: 80 },
+            { id: 102, kind: "Window", wall: "s", pos: 150, len: 130 }
+          ]
+        }
+      ]
+    }]
+  };
+}
+
+function encodeDoc(doc) {
+  const s = JSON.stringify(doc);
+  return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function decodeDoc(str) {
+  try {
+    let b = str.replace(/-/g, "+").replace(/_/g, "/");
+    while (b.length % 4) b += "=";
+    const doc = JSON.parse(decodeURIComponent(escape(atob(b))));
+    return doc && doc.homes && doc.homes.length ? doc : null;
+  } catch (e) { return null; }
+}
+function inter(a, b) {
+  const w = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+  const h = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+  return w > 1 && h > 1;
+}
+
+class Component extends DCLogic {
+  state = {
+    doc: defaultDoc(), hi: 0, ri: 0, slot: "A", sel: null,
+    zoom: 1, panx: 0, pany: 0,
+    editing: false, catName: "", catW: "", catD: "", catCat: "storage",
+    shareLabel: "Share link", savedNote: "Saved in this browser automatically."
+  };
+
+  componentDidMount() {
+    const hash = (location.hash || "").replace(/^#/, "");
+    const m = /(?:^|&)p=([^&]+)/.exec(hash);
+    let loaded = null;
+    if (m) loaded = decodeDoc(m[1]);
+    if (!loaded) {
+      try { const raw = localStorage.getItem(KEY); if (raw) loaded = JSON.parse(raw); } catch (e) { loaded = null; }
+    }
+    if (loaded && loaded.homes && loaded.homes.length) {
+      this.setState({ doc: loaded, savedNote: m ? "Opened from a shared link." : "Restored from this browser." });
+    }
+
+    this.onWheel = e => {
+      const host = e.target && e.target.closest ? e.target.closest("[data-stagewrap]") : null;
+      if (!host) return;
+      e.preventDefault();
+      const box = host.getBoundingClientRect();
+      const cx = e.clientX - (box.left + box.width / 2) - this.state.panx;
+      const cy = e.clientY - (box.top + box.height / 2) - this.state.pany;
+      const f = Math.exp(-e.deltaY * 0.0016);
+      const z = Math.min(6, Math.max(0.3, this.state.zoom * f));
+      const k = z / this.state.zoom;
+      this.setState({ zoom: z, panx: this.state.panx - cx * (k - 1), pany: this.state.pany - cy * (k - 1) });
+    };
+    window.addEventListener("wheel", this.onWheel, { passive: false });
+
+    this.onKey = e => {
+      const tag = (e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "select" || tag === "textarea") return;
+      const meta = e.metaKey || e.ctrlKey;
+      if (meta && (e.key === "z" || e.key === "Z")) {
+        e.preventDefault();
+        return e.shiftKey ? this.redo() : this.undo();
+      }
+      const sel = this.state.sel;
+      if (!sel) return;
+      if (e.key === "Escape") return this.setState({ sel: null });
+      if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); return this.del(); }
+      if (sel.t !== "item") return;
+      const it = this.selItem(); if (!it) return;
+      const step = e.shiftKey ? 1 : 5;
+      const map = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+      if (map[e.key]) { e.preventDefault(); this.hist(); this.move(it.id, it.x + map[e.key][0], it.y + map[e.key][1], false); }
+      else if (e.key === "r" || e.key === "R") { this.hist(); this.rotate(); }
+    };
+    window.addEventListener("keydown", this.onKey);
+  }
+
+  componentDidUpdate() {
+    if (this.lastDoc !== this.state.doc) {
+      this.lastDoc = this.state.doc;
+      clearTimeout(this.saveT);
+      this.saveT = setTimeout(() => {
+        try { localStorage.setItem(KEY, JSON.stringify(this.state.doc)); } catch (e) {}
+      }, 400);
+      if (this.state.shareLabel !== "Share link") this.setState({ shareLabel: "Share link" });
+    }
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener("wheel", this.onWheel);
+    window.removeEventListener("keydown", this.onKey);
+    clearTimeout(this.saveT);
+  }
+
+  /* ---- history ---- */
+  hist() {
+    this.past = this.past || [];
+    this.past.push(JSON.stringify(this.state.doc));
+    if (this.past.length > 80) this.past.shift();
+    this.future = [];
+  }
+  undo() {
+    if (!this.past || !this.past.length) return;
+    this.future = this.future || [];
+    this.future.push(JSON.stringify(this.state.doc));
+    this.setState({ doc: JSON.parse(this.past.pop()), sel: null });
+  }
+  redo() {
+    if (!this.future || !this.future.length) return;
+    this.past = this.past || [];
+    this.past.push(JSON.stringify(this.state.doc));
+    this.setState({ doc: JSON.parse(this.future.pop()), sel: null });
+  }
+
+  /* ---- accessors ---- */
+  home() { return this.state.doc.homes[Math.min(this.state.hi, this.state.doc.homes.length - 1)]; }
+  room() { const h = this.home(); return h.rooms[Math.min(this.state.ri, h.rooms.length - 1)]; }
+  setDoc(fn) { this.setState(s => ({ doc: fn(s.doc, s) })); }
+  setHome(fn) {
+    this.setDoc((d, s) => Object.assign({}, d, {
+      homes: d.homes.map((h, i) => i === s.hi ? Object.assign({}, h, fn(h, s)) : h)
+    }));
+  }
+  setRoom(fn) {
+    this.setHome((h, s) => ({ rooms: h.rooms.map((r, i) => i === s.ri ? Object.assign({}, r, fn(r, s)) : r) }));
+  }
+  items() { return this.room().slots[this.state.slot] || []; }
+  setItems(fn) {
+    this.setRoom((r, s) => ({ slots: Object.assign({}, r.slots, { [s.slot]: fn(r.slots[s.slot] || []) }) }));
+  }
+  selItem() { const s = this.state.sel; return s && s.t === "item" ? this.items().find(i => i.id === s.id) || null : null; }
+  selOpening() { const s = this.state.sel; return s && s.t === "opening" ? this.room().openings.find(o => o.id === s.id) || null : null; }
+  foot(it) { return it.r % 180 === 0 ? [it.w, it.d] : [it.d, it.w]; }
+  box(it) { const [w, h] = this.foot(it); return { x0: it.x - w / 2, y0: it.y - h / 2, x1: it.x + w / 2, y1: it.y + h / 2, w, h }; }
+
+  cutRects() {
+    const r = this.room(), c = r.cuts || {}, out = [];
+    const live = x => x && x.w > 0 && x.d > 0;
+    if (live(c.nw)) out.push({ x0: 0, y0: 0, x1: c.nw.w, y1: c.nw.d, key: "nw" });
+    if (live(c.ne)) out.push({ x0: r.w - c.ne.w, y0: 0, x1: r.w, y1: c.ne.d, key: "ne" });
+    if (live(c.se)) out.push({ x0: r.w - c.se.w, y0: r.d - c.se.d, x1: r.w, y1: r.d, key: "se" });
+    if (live(c.sw)) out.push({ x0: 0, y0: r.d - c.sw.d, x1: c.sw.w, y1: r.d, key: "sw" });
+    return out;
+  }
+  doorZone(d, depth) {
+    const r = this.room(), L = d.len, t = Math.max(L, depth || L);
+    if (d.wall === "n") return { x0: d.pos, y0: 0, x1: d.pos + L, y1: t };
+    if (d.wall === "s") return { x0: d.pos, y0: r.d - t, x1: d.pos + L, y1: r.d };
+    if (d.wall === "w") return { x0: 0, y0: d.pos, x1: t, y1: d.pos + L };
+    return { x0: r.w - t, y0: d.pos, x1: r.w, y1: d.pos + L };
+  }
+
+  move(id, x, y, snap) {
+    const r = this.room();
+    this.setItems(list => list.map(it => {
+      if (it.id !== id) return it;
+      const [w, h] = this.foot(it);
+      let nx = Math.round(x / 5) * 5, ny = Math.round(y / 5) * 5;
+      if (snap !== false) {
+        if (Math.abs(nx - w / 2) < 14) nx = w / 2;
+        if (Math.abs(r.w - nx - w / 2) < 14) nx = r.w - w / 2;
+        if (Math.abs(ny - h / 2) < 14) ny = h / 2;
+        if (Math.abs(r.d - ny - h / 2) < 14) ny = r.d - h / 2;
+      }
+      nx = Math.min(Math.max(nx, w / 2), Math.max(w / 2, r.w - w / 2));
+      ny = Math.min(Math.max(ny, h / 2), Math.max(h / 2, r.d - h / 2));
+      return Object.assign({}, it, { x: nx, y: ny });
+    }));
+  }
+  rotate() {
+    const it = this.selItem(); if (!it) return;
+    this.setItems(l => l.map(i => i.id === it.id ? Object.assign({}, i, { r: (i.r + 90) % 360 }) : i));
+  }
+  del() {
+    const s = this.state.sel; if (!s) return;
+    this.hist();
+    if (s.t === "item") this.setItems(l => l.filter(i => i.id !== s.id));
+    else this.setRoom(r => ({ openings: r.openings.filter(o => o.id !== s.id) }));
+    this.setState({ sel: null });
+  }
+  add(name, w, d, cat) {
+    const r = this.room(), id = r.nextId;
+    this.hist();
+    this.setRoom((rr, s) => ({
+      nextId: id + 1,
+      slots: Object.assign({}, rr.slots, {
+        [s.slot]: (rr.slots[s.slot] || []).concat([{ id, name, w, d, cat: cat || "other", x: Math.round(rr.w / 2), y: Math.round(rr.d / 2), r: 0 }])
+      })
+    }));
+    this.setState({ sel: { t: "item", id } });
+  }
+
+  /* cm per px is read from the live room box, so no stored measurement is needed */
+  drag(e, o, kind) {
+    e.stopPropagation();
+    const host = e.currentTarget.parentElement;
+    const rect = host.getBoundingClientRect();
+    const k = rect.width / this.room().w;
+    const sx = e.clientX, sy = e.clientY;
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    this.hist();
+    let mv;
+    if (kind === "item") {
+      this.setState({ sel: { t: "item", id: o.id } });
+      const ox = o.x, oy = o.y;
+      mv = ev => this.move(o.id, ox + (ev.clientX - sx) / k, oy + (ev.clientY - sy) / k, !ev.altKey);
+    } else {
+      this.setState({ sel: { t: "opening", id: o.id } });
+      const horiz = o.wall === "n" || o.wall === "s", op = o.pos;
+      mv = ev => {
+        const r = this.room(), span = horiz ? r.w : r.d;
+        const dd = (horiz ? ev.clientX - sx : ev.clientY - sy) / k;
+        const np = Math.min(Math.max(Math.round((op + dd) / 5) * 5, 0), Math.max(0, span - o.len));
+        this.setRoom(rr => ({ openings: rr.openings.map(x => x.id === o.id ? Object.assign({}, x, { pos: np }) : x) }));
+      };
+    }
+    const up = () => { el.removeEventListener("pointermove", mv); el.removeEventListener("pointerup", up); };
+    el.addEventListener("pointermove", mv);
+    el.addEventListener("pointerup", up);
+  }
+
+  issueList() {
+    const r = this.room(), walk = this.props.walkwayCm ?? 60;
+    const list = this.items().map(i => ({ i, b: this.box(i) }));
+    const solid = list.filter(x => x.i.cat !== "soft");
+    const out = [];
+    for (let a = 0; a < solid.length; a++) {
+      for (let b = a + 1; b < solid.length; b++) {
+        if (inter(solid[a].b, solid[b].b)) out.push({ bad: true, ids: [solid[a].i.id], text: solid[a].i.name + " overlaps " + solid[b].i.name });
+      }
+    }
+    for (const x of list) {
+      for (const c of this.cutRects()) {
+        if (inter(x.b, c)) out.push({ bad: true, ids: [x.i.id], text: x.i.name + " sits outside the floor" });
+      }
+    }
+    for (const d of r.openings) {
+      if (d.kind !== "Door") continue;
+      const swing = this.doorZone(d, d.len);
+      const approach = this.doorZone(d, walk);
+      for (const x of solid) {
+        if (inter(x.b, swing)) out.push({ bad: true, ids: [x.i.id], text: x.i.name + " blocks the door swing" });
+        else if (inter(x.b, approach)) out.push({ bad: false, ids: [x.i.id], text: x.i.name + " leaves under " + walk + " cm at the door" });
+      }
+    }
+    for (let a = 0; a < solid.length; a++) {
+      for (let b = a + 1; b < solid.length; b++) {
+        const A = solid[a].b, B = solid[b].b;
+        const gx = Math.max(A.x0, B.x0) - Math.min(A.x1, B.x1);
+        const gy = Math.max(A.y0, B.y0) - Math.min(A.y1, B.y1);
+        const overX = Math.min(A.x1, B.x1) - Math.max(A.x0, B.x0) > 30;
+        const overY = Math.min(A.y1, B.y1) - Math.max(A.y0, B.y0) > 30;
+        let g = null;
+        if (overY && gx > 2 && gx < walk) g = gx;
+        else if (overX && gy > 2 && gy < walk) g = gy;
+        if (g !== null) out.push({ bad: false, ids: [solid[a].i.id], text: Math.round(g) + " cm gap between " + solid[a].i.name + " and " + solid[b].i.name });
+      }
+    }
+    const seen = {};
+    return out.filter(o => (seen[o.text] ? false : (seen[o.text] = true))).slice(0, 10);
+  }
+
+  renderVals() {
+    const s = this.state, doc = s.doc, home = this.home(), r = this.room();
+    const list = this.items();
+    const it = this.selItem(), op = this.selOpening();
+    const showGrid = this.props.showGrid ?? true;
+    const gridCm = this.props.gridCm ?? 50;
+    const showDims = this.props.showDims ?? true;
+    const fills = this.props.typeFills ?? true;
+    const walk = this.props.walkwayCm ?? 60;
+    const issues = this.issueList();
+    const flagged = {};
+    issues.forEach(i => i.ids.forEach(id => { flagged[id] = flagged[id] === "bad" ? "bad" : (i.bad ? "bad" : "note"); }));
+
+    const pw = v => (v / r.w * 100).toFixed(4) + "%";
+    const ph = v => (v / r.d * 100).toFixed(4) + "%";
+
+    const pill = (on, h) => ({
+      height: (h || 28) + "px", padding: "0 10px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.02em",
+      cursor: "pointer", borderRadius: "5px", border: "1px solid " + (on ? INK : EDGE),
+      background: on ? INK : "#fdfbf6", color: on ? "#fdfbf6" : INK, whiteSpace: "nowrap"
+    });
+    const square = on => Object.assign(pill(on), { width: "30px", padding: 0, fontFamily: MONO });
+    const wallBtn = w => Object.assign(pill(!!op && op.wall === w, 26), { padding: 0, fontSize: "10px" });
+    const ghost = live => ({
+      height: "28px", padding: "0 10px", fontSize: "11px", fontWeight: 600, borderRadius: "5px",
+      border: "1px solid " + (live ? LINE : SOFT), background: live ? "#fdfbf6" : "transparent",
+      color: live ? INK : "#a3977f", cursor: live ? "pointer" : "default"
+    });
+
+    const total = r.w * r.d - this.cutRects().reduce((a, c) => a + (c.x1 - c.x0) * (c.y1 - c.y0), 0);
+    const taken = list.filter(i => i.cat !== "soft").reduce((a, i) => a + i.w * i.d, 0);
+
+    const cornerRow = (key, label) => {
+      const c = (r.cuts || {})[key] || {};
+      const set = f => e => {
+        const lim = (f === "w" ? r.w : r.d) - 10;
+        const v = Math.max(0, Math.min(lim, +e.target.value || 0));
+        this.hist();
+        this.setRoom(rr => {
+          const cuts = Object.assign({}, rr.cuts);
+          const cur = Object.assign({ w: 0, d: 0 }, cuts[key]);
+          cur[f] = v;
+          if (cur.w > 0 || cur.d > 0) cuts[key] = cur; else delete cuts[key];
+          return { cuts };
+        });
+      };
+      return {
+        label, w: c.w || "", d: c.d || "",
+        onW: set("w"), onD: set("d"),
+        onClear: () => { this.hist(); this.setRoom(rr => { const cuts = Object.assign({}, rr.cuts); delete cuts[key]; return { cuts }; }); }
+      };
+    };
+
+    return {
+      homeId: home.id,
+      homeOpts: doc.homes.map(h => ({ id: h.id, name: h.name })),
+      homeName: home.name,
+      roomTabs: home.rooms.map((rm, i) => ({ i, name: rm.name, style: pill(i === s.ri) })),
+      roomName: r.name, roomW: r.w, roomD: r.d,
+      corners: [cornerRow("nw", "Top left"), cornerRow("ne", "Top right"), cornerRow("se", "Low right"), cornerRow("sw", "Low left")],
+      slotA: square(s.slot === "A"), slotB: square(s.slot === "B"), slotC: square(s.slot === "C"),
+      wallN: wallBtn("n"), wallE: wallBtn("e"), wallS: wallBtn("s"), wallW: wallBtn("w"),
+      undoStyle: ghost(!!(this.past && this.past.length)), redoStyle: ghost(!!(this.future && this.future.length)),
+      shareLabel: s.shareLabel, savedNote: s.savedNote,
+      zoomText: Math.round(s.zoom * 100) + "%",
+      walkway: walk,
+      editing: s.editing, editLabel: s.editing ? "Done" : "Edit",
+      catName: s.catName, catW: s.catW, catD: s.catD, catCat: s.catCat,
+      printTitle: home.name + " — " + r.name + ", layout " + s.slot,
+      printMeta: r.w + " × " + r.d + " cm · " + (total / 10000).toFixed(1) + " m²",
+
+      catalog: doc.catalog.map(c => ({
+        name: c.name, dims: c.w + " × " + c.d,
+        onAdd: () => this.add(c.name, c.w, c.d, c.cat),
+        onDel: e => { e.stopPropagation(); this.hist(); this.setDoc(d => Object.assign({}, d, { catalog: d.catalog.filter(x => x.id !== c.id) })); },
+        style: {
+          flex: 1, display: "flex", alignItems: "center", gap: "6px", minWidth: 0,
+          padding: "6px 8px", textAlign: "left", fontSize: "12px", color: INK,
+          background: "#fdfbf6", border: "1px solid " + SOFT, borderRadius: "5px", cursor: "pointer"
+        },
+        swatch: {
+          width: "9px", height: "9px", flex: "none",
+          background: (CATS[c.cat] || CATS.other).fill, border: "1px solid " + (CATS[c.cat] || CATS.other).ink
+        }
+      })),
+
+      stageStyle: {
+        position: "absolute", inset: 0, containerType: "size",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        transform: "translate(" + s.panx + "px, " + s.pany + "px) scale(" + s.zoom + ")",
+        transformOrigin: "center center"
+      },
+      roomStyle: {
+        position: "relative", flex: "none",
+        width: "min(100cqw - 60px, (100cqh - 60px) * " + (r.w / r.d).toFixed(4) + ")",
+        aspectRatio: r.w + " / " + r.d,
+        background: "#fdfbf6", border: "2px solid " + INK
+      },
+      gridStyle: {
+        position: "absolute", inset: 0, opacity: showGrid ? 1 : 0, pointerEvents: "none",
+        backgroundImage: "linear-gradient(to right, rgba(87,81,74,0.18) 1px, transparent 1px), linear-gradient(to bottom, rgba(87,81,74,0.18) 1px, transparent 1px)",
+        backgroundSize: pw(gridCm) + " " + ph(gridCm)
+      },
+
+      cutBlocks: this.cutRects().map(c => {
+        const st = {
+          position: "absolute", background: "#e1d9c9", zIndex: 8, pointerEvents: "none",
+          width: "calc(" + pw(c.x1 - c.x0) + " + 2px)", height: "calc(" + ph(c.y1 - c.y0) + " + 2px)"
+        };
+        if (c.key === "nw") { st.left = "-2px"; st.top = "-2px"; st.borderRight = "2px solid " + INK; st.borderBottom = "2px solid " + INK; }
+        if (c.key === "ne") { st.right = "-2px"; st.top = "-2px"; st.borderLeft = "2px solid " + INK; st.borderBottom = "2px solid " + INK; }
+        if (c.key === "se") { st.right = "-2px"; st.bottom = "-2px"; st.borderLeft = "2px solid " + INK; st.borderTop = "2px solid " + INK; }
+        if (c.key === "sw") { st.left = "-2px"; st.bottom = "-2px"; st.borderRight = "2px solid " + INK; st.borderTop = "2px solid " + INK; }
+        return { style: st };
+      }),
+
+      swings: r.openings.filter(o => o.kind === "Door").map(d => {
+        const z = this.doorZone(d, d.len), f = !!d.flip;
+        let c;
+        if (d.wall === "n") c = f ? "0 0 0 100%" : "0 0 100% 0";
+        else if (d.wall === "s") c = f ? "100% 0 0 0" : "0 100% 0 0";
+        else if (d.wall === "w") c = f ? "0 100% 0 0" : "0 0 100% 0";
+        else c = f ? "100% 0 0 0" : "0 0 0 100%";
+        return {
+          style: {
+            position: "absolute", left: pw(z.x0), top: ph(z.y0),
+            width: pw(z.x1 - z.x0), height: ph(z.y1 - z.y0),
+            border: "1px dashed #b3a893", borderRadius: c, pointerEvents: "none", zIndex: 1
+          }
+        };
+      }),
+
+      items: list.map(i => {
+        const b = this.box(i), on = it && it.id === i.id;
+        const meta = CATS[i.cat] || CATS.other;
+        const soft = i.cat === "soft";
+        const flag = flagged[i.id];
+        const edge = on ? ACC : flag === "bad" ? BAD : flag === "note" ? NOTE : LINE;
+        const small = Math.min(b.w, b.h) < 55;
+        return {
+          name: i.name, dims: i.w + " × " + i.d,
+          onDown: e => this.drag(e, i, "item"),
+          style: {
+            position: "absolute", left: pw(b.x0), top: ph(b.y0), width: pw(b.w), height: ph(b.h),
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px",
+            padding: "2px", textAlign: "center", overflow: "hidden",
+            background: on ? ACCL : fills ? meta.fill : "transparent",
+            border: (soft ? "1px dashed " : on ? "2px solid " : "1px solid ") + edge,
+            borderRadius: "3px", cursor: "grab", touchAction: "none", userSelect: "none",
+            zIndex: soft ? 2 : on ? 5 : 3
+          },
+          labelStyle: {
+            fontSize: small ? "9px" : "11px", fontWeight: 600, lineHeight: 1.1, color: INK,
+            display: Math.min(b.w, b.h) < 30 ? "none" : "block"
+          },
+          dimStyle: {
+            fontFamily: MONO, fontSize: "9px", lineHeight: 1.1, color: MUTE,
+            display: !showDims || b.h < 60 || b.w < 80 ? "none" : "block"
+          }
+        };
+      }),
+
+      openings: r.openings.map(o => {
+        const horiz = o.wall === "n" || o.wall === "s";
+        const on = op && op.id === o.id;
+        const st = {
+          position: "absolute", zIndex: 6,
+          cursor: horiz ? "ew-resize" : "ns-resize", touchAction: "none", background: "#fdfbf6",
+          boxShadow: "inset 0 0 0 " + (on ? "2px " + ACC : "1.5px " + INK)
+        };
+        if (o.kind === "Window") {
+          st.backgroundImage = horiz
+            ? "linear-gradient(to bottom, transparent 45%, " + INK + " 45%, " + INK + " 55%, transparent 55%)"
+            : "linear-gradient(to right, transparent 45%, " + INK + " 45%, " + INK + " 55%, transparent 55%)";
+        }
+        if (horiz) {
+          st.left = pw(o.pos); st.width = pw(o.len); st.height = "12px";
+          st.top = o.wall === "n" ? "-6px" : "calc(100% - 6px)";
+        } else {
+          st.top = ph(o.pos); st.height = ph(o.len); st.width = "12px";
+          st.left = o.wall === "w" ? "-6px" : "calc(100% - 6px)";
+        }
+        return { style: st, title: o.kind + " " + o.len + " cm — drag along the wall", onDown: e => this.drag(e, o, "opening") };
+      }),
+
+      wLabel: r.w + " cm",
+      wLabelStyle: { position: "absolute", left: 0, width: "100%", bottom: "-22px", textAlign: "center", fontFamily: MONO, fontSize: "10px", letterSpacing: "0.06em", color: MUTE, pointerEvents: "none" },
+      dLabel: r.d + " cm",
+      dLabelStyle: { position: "absolute", top: "50%", right: "-10px", transform: "translate(100%, -50%) rotate(90deg)", fontFamily: MONO, fontSize: "10px", letterSpacing: "0.06em", color: MUTE, whiteSpace: "nowrap", pointerEvents: "none" },
+
+      selIsItem: !!it, selIsOpening: !!op, noSel: !it && !op,
+      selIsDoor: !!op && op.kind === "Door",
+      selName: it ? it.name : op ? op.kind : "",
+      selW: it ? it.w : "", selD: it ? it.d : "", selLen: op ? op.len : "",
+
+      issues: issues.map(i => ({
+        text: i.text,
+        onClick: () => this.setState({ sel: { t: "item", id: i.ids[0] } }),
+        style: {
+          display: "flex", alignItems: "flex-start", gap: "6px", width: "100%",
+          padding: "6px 8px", textAlign: "left", cursor: "pointer", color: INK,
+          background: "#fdfbf6", border: "1px solid " + (i.bad ? BAD : SOFT), borderRadius: "5px"
+        },
+        dot: { width: "7px", height: "7px", marginTop: "5px", flex: "none", borderRadius: "50%", background: i.bad ? BAD : NOTE }
+      })),
+      clean: issues.length === 0,
+
+      list: list.map(i => ({
+        name: i.name, dims: i.w + " × " + i.d + " cm",
+        onClick: () => this.setState({ sel: { t: "item", id: i.id } }),
+        style: {
+          display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px",
+          width: "100%", padding: "6px 8px", textAlign: "left", cursor: "pointer", color: INK,
+          background: it && it.id === i.id ? ACCL : "#fdfbf6",
+          border: "1px solid " + (it && it.id === i.id ? ACC : SOFT), borderRadius: "5px"
+        }
+      })),
+      areaText: (total / 10000).toFixed(1) + " m²",
+      fillText: total > 0 ? Math.round(taken / total * 100) + "%" : "—",
+
+      onPickHome: e => {
+        const id = +e.target.value;
+        const i = doc.homes.findIndex(h => h.id === id);
+        if (i >= 0) this.setState({ hi: i, ri: 0, sel: null, zoom: 1, panx: 0, pany: 0 });
+      },
+      onAddHome: () => {
+        const id = doc.nextHome, rid = doc.nextRoom;
+        this.hist();
+        this.setDoc(d => Object.assign({}, d, {
+          nextHome: id + 1, nextRoom: rid + 1,
+          homes: d.homes.concat([{
+            id, name: "Home " + id, rooms: [{
+              id: rid, name: "Room 1", w: 320, d: 300, cuts: {}, nextId: 1, nextOid: 101,
+              slots: { A: [], B: [], C: [] },
+              openings: [{ id: 100, kind: "Door", wall: "s", pos: 30, len: 90 }]
+            }]
+          }])
+        }));
+        this.setState({ hi: doc.homes.length, ri: 0, sel: null });
+      },
+      onHomeName: e => { const v = e.target.value; this.setHome(() => ({ name: v })); },
+      onRoomClick: e => {
+        const b = e.target.closest("[data-room]"); if (!b) return;
+        this.setState({ ri: +b.getAttribute("data-room"), sel: null, zoom: 1, panx: 0, pany: 0 });
+      },
+      onAddRoom: () => {
+        const rid = doc.nextRoom;
+        this.hist();
+        this.setDoc(d => Object.assign({}, d, { nextRoom: rid + 1 }));
+        this.setHome(h => ({
+          rooms: h.rooms.concat([{
+            id: rid, name: "Room " + (h.rooms.length + 1), w: 320, d: 300, cuts: {}, nextId: 1, nextOid: 101,
+            slots: { A: [], B: [], C: [] },
+            openings: [{ id: 100, kind: "Door", wall: "s", pos: 30, len: 90 }]
+          }])
+        }));
+        this.setState({ ri: home.rooms.length, sel: null });
+      },
+      onDelRoom: () => {
+        if (home.rooms.length < 2) return;
+        this.hist();
+        this.setHome(h => ({ rooms: h.rooms.filter((x, i) => i !== s.ri) }));
+        this.setState({ ri: Math.max(0, s.ri - 1), sel: null });
+      },
+      onRoomName: e => { const v = e.target.value; this.setRoom(() => ({ name: v })); },
+      onRoomW: e => { const v = Math.max(150, Math.min(2000, +e.target.value || 150)); this.hist(); this.setRoom(() => ({ w: v })); },
+      onRoomD: e => { const v = Math.max(150, Math.min(2000, +e.target.value || 150)); this.hist(); this.setRoom(() => ({ d: v })); },
+
+      onToggleEdit: () => this.setState({ editing: !s.editing }),
+      onCatName: e => this.setState({ catName: e.target.value }),
+      onCatW: e => this.setState({ catW: e.target.value }),
+      onCatD: e => this.setState({ catD: e.target.value }),
+      onCatCat: e => this.setState({ catCat: e.target.value }),
+      onCatAdd: () => {
+        const w = +s.catW, d = +s.catD;
+        if (!(w > 0 && d > 0)) return;
+        this.hist();
+        this.setDoc(dd => Object.assign({}, dd, {
+          catalog: dd.catalog.concat([{ id: "c" + Date.now(), name: s.catName.trim() || "Piece", w, d, cat: s.catCat }])
+        }));
+        this.setState({ catName: "", catW: "", catD: "" });
+      },
+
+      onWallClick: e => {
+        const b = e.target.closest("[data-wall]"); if (!b || !op) return;
+        const w = b.getAttribute("data-wall");
+        const span = (w === "n" || w === "s") ? r.w : r.d;
+        this.hist();
+        this.setRoom(rr => ({ openings: rr.openings.map(x => x.id === op.id ? Object.assign({}, x, { wall: w, pos: Math.min(x.pos, Math.max(0, span - x.len)) }) : x) }));
+      },
+      onAddDoor: () => {
+        const id = r.nextOid; this.hist();
+        this.setRoom(rr => ({ openings: rr.openings.concat([{ id, kind: "Door", wall: "w", pos: 20, len: 90 }]), nextOid: id + 1 }));
+        this.setState({ sel: { t: "opening", id } });
+      },
+      onAddWindow: () => {
+        const id = r.nextOid; this.hist();
+        this.setRoom(rr => ({ openings: rr.openings.concat([{ id, kind: "Window", wall: "e", pos: 60, len: 120 }]), nextOid: id + 1 }));
+        this.setState({ sel: { t: "opening", id } });
+      },
+      onSelLen: e => { if (!op) return; const v = Math.max(20, +e.target.value || 20); this.hist(); this.setRoom(rr => ({ openings: rr.openings.map(x => x.id === op.id ? Object.assign({}, x, { len: v }) : x) })); },
+      onFlipDoor: () => { if (!op) return; this.hist(); this.setRoom(rr => ({ openings: rr.openings.map(x => x.id === op.id ? Object.assign({}, x, { flip: !x.flip }) : x) })); },
+
+      onSelName: e => { if (!it) return; const v = e.target.value; this.setItems(l => l.map(x => x.id === it.id ? Object.assign({}, x, { name: v }) : x)); },
+      onSelW: e => { if (!it) return; const v = Math.max(10, +e.target.value || 10); this.hist(); this.setItems(l => l.map(x => x.id === it.id ? Object.assign({}, x, { w: v }) : x)); },
+      onSelD: e => { if (!it) return; const v = Math.max(10, +e.target.value || 10); this.hist(); this.setItems(l => l.map(x => x.id === it.id ? Object.assign({}, x, { d: v }) : x)); },
+      onRotate: () => { this.hist(); this.rotate(); },
+      onDelete: () => this.del(),
+      onUndo: () => this.undo(),
+      onRedo: () => this.redo(),
+
+      onCanvasDown: e => {
+        const sx = e.clientX, sy = e.clientY, p0x = s.panx, p0y = s.pany;
+        let moved = false;
+        const mv = ev => {
+          const dx = ev.clientX - sx, dy = ev.clientY - sy;
+          if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+          moved = true;
+          this.setState({ panx: p0x + dx, pany: p0y + dy });
+        };
+        const up = () => {
+          window.removeEventListener("pointermove", mv);
+          window.removeEventListener("pointerup", up);
+          if (!moved) this.setState({ sel: null });
+        };
+        window.addEventListener("pointermove", mv);
+        window.addEventListener("pointerup", up);
+      },
+      onZoomIn: () => this.setState({ zoom: Math.min(6, s.zoom * 1.25) }),
+      onZoomOut: () => this.setState({ zoom: Math.max(0.3, s.zoom / 1.25) }),
+      onFit: () => this.setState({ zoom: 1, panx: 0, pany: 0 }),
+
+      onSlotA: () => this.setState({ slot: "A", sel: null }),
+      onSlotB: () => this.setState({ slot: "B", sel: null }),
+      onSlotC: () => this.setState({ slot: "C", sel: null }),
+      onReset: () => { this.hist(); this.setItems(() => []); this.setState({ sel: null }); },
+      onCopyHere: () => {
+        const order = ["A", "B", "C"], next = order[(order.indexOf(s.slot) + 1) % 3];
+        this.hist();
+        this.setRoom((rr, st) => ({ slots: Object.assign({}, rr.slots, { [next]: (rr.slots[st.slot] || []).map(o => Object.assign({}, o)) }) }));
+        this.setState({ slot: next, sel: null });
+      },
+
+      onShare: () => {
+        const url = location.origin + location.pathname + "#p=" + encodeDoc(doc);
+        try { history.replaceState(null, "", "#p=" + encodeDoc(doc)); } catch (e) {}
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(
+            () => this.setState({ shareLabel: "Link copied" }),
+            () => this.setState({ shareLabel: "Link in address bar" })
+          );
+        } else this.setState({ shareLabel: "Link in address bar" });
+      },
+      onPrint: () => window.print(),
+      onExport: () => {
+        const blob = new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = (home.name || "plan").replace(/\s+/g, "-").toLowerCase() + "-plan.json";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      },
+      onImport: e => {
+        const f = e.target.files && e.target.files[0]; if (!f) return;
+        const rd = new FileReader();
+        rd.onload = () => {
+          try {
+            const d = JSON.parse(rd.result);
+            if (!d || !d.homes || !d.homes.length) throw 0;
+            this.hist();
+            this.setState({ doc: d, hi: 0, ri: 0, slot: "A", sel: null, savedNote: "Imported " + f.name });
+          } catch (err) { this.setState({ savedNote: "That file could not be read." }); }
+        };
+        rd.readAsText(f);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
