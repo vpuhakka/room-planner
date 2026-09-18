@@ -1,5 +1,7 @@
 import type { Box, CornerKey, Issue, Item, Opening, Rect, Room } from "./types";
 
+export const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+
 /** Rotation is quantised to 90°, so the footprint is just a swap. */
 export function foot(it: Item): [number, number] {
   return it.r % 180 === 0 ? [it.w, it.d] : [it.d, it.w];
@@ -38,20 +40,41 @@ export function doorZone(room: Room, d: Opening, depth?: number): Rect {
   return { x0: room.w - t, y0: d.pos, x1: room.w, y1: d.pos + L };
 }
 
-/** Snap to 5 cm, wall-snap within 14 cm unless suppressed, then clamp inside the floor. */
+/** Snap to 5 cm and wall-snap within 14 cm unless suppressed, then clamp inside the floor.
+ *  snap=false leaves positions as given, so Alt-drag and the 1 cm Shift-nudge stay fine-grained. */
 export function snapMove(room: Room, it: Item, x: number, y: number, snap = true): { x: number; y: number } {
   const [w, h] = foot(it);
-  let nx = Math.round(x / 5) * 5;
-  let ny = Math.round(y / 5) * 5;
+  let nx = x;
+  let ny = y;
   if (snap) {
+    nx = Math.round(nx / 5) * 5;
+    ny = Math.round(ny / 5) * 5;
     if (Math.abs(nx - w / 2) < 14) nx = w / 2;
     if (Math.abs(room.w - nx - w / 2) < 14) nx = room.w - w / 2;
     if (Math.abs(ny - h / 2) < 14) ny = h / 2;
     if (Math.abs(room.d - ny - h / 2) < 14) ny = room.d - h / 2;
   }
-  nx = Math.min(Math.max(nx, w / 2), Math.max(w / 2, room.w - w / 2));
-  ny = Math.min(Math.max(ny, h / 2), Math.max(h / 2, room.d - h / 2));
+  nx = clamp(nx, w / 2, Math.max(w / 2, room.w - w / 2));
+  ny = clamp(ny, h / 2, Math.max(h / 2, room.d - h / 2));
   return { x: nx, y: ny };
+}
+
+/** Keep an opening on its wall: the length fits the span, the position keeps both ends inside. */
+export function clampOpening(room: Room, o: Opening): Opening {
+  const span = o.wall === "n" || o.wall === "s" ? room.w : room.d;
+  const len = clamp(o.len, 20, span);
+  return { ...o, len, pos: clamp(o.pos, 0, span - len) };
+}
+
+/** Resize the room, re-fitting openings and corner cuts to the new bounds. */
+export function fitRoom(room: Room, w: number, d: number): Partial<Room> {
+  const next = { ...room, w, d };
+  const cuts: Room["cuts"] = {};
+  for (const k of Object.keys(room.cuts) as CornerKey[]) {
+    const c = room.cuts[k]!;
+    cuts[k] = { w: Math.min(c.w, w - 10), d: Math.min(c.d, d - 10) };
+  }
+  return { w, d, cuts, openings: room.openings.map((o) => clampOpening(next, o)) };
 }
 
 /** Floor area in cm², minus the corner cuts. */
@@ -75,6 +98,10 @@ export function issueList(room: Room, items: Item[], walkwayCm: number): Issue[]
 
   const cuts = cutRects(room);
   for (const x of list) {
+    // same 1 cm tolerance as inter(); catches rotate/resize/import paths that bypass snapMove's clamp
+    if (x.b.x0 < -1 || x.b.y0 < -1 || x.b.x1 > room.w + 1 || x.b.y1 > room.d + 1) {
+      out.push({ bad: true, ids: [x.i.id], text: `${x.i.name} sits outside the floor` });
+    }
     for (const c of cuts) {
       if (inter(x.b, c)) out.push({ bad: true, ids: [x.i.id], text: `${x.i.name} sits outside the floor` });
     }

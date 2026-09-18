@@ -1,3 +1,5 @@
+import { clampOpening } from "../geometry";
+import NumField from "./NumField";
 import type { Planner } from "../usePlanner";
 import type { Wall } from "../types";
 
@@ -27,10 +29,9 @@ export default function RightRail({ p }: { p: Planner }) {
             <div className="grid2">
               <label className="lbl">
                 Width
-                <input
-                  className="field field--num" type="number" step={5} value={it.w}
-                  onChange={(e) => {
-                    const v = Math.max(10, +e.target.value || 10);
+                <NumField
+                  step={5} value={it.w} min={10}
+                  onCommit={(v) => {
                     p.hist();
                     p.setItems((l) => l.map((x) => (x.id === it.id ? { ...x, w: v } : x)));
                   }}
@@ -38,10 +39,9 @@ export default function RightRail({ p }: { p: Planner }) {
               </label>
               <label className="lbl">
                 Depth
-                <input
-                  className="field field--num" type="number" step={5} value={it.d}
-                  onChange={(e) => {
-                    const v = Math.max(10, +e.target.value || 10);
+                <NumField
+                  step={5} value={it.d} min={10}
+                  onCommit={(v) => {
                     p.hist();
                     p.setItems((l) => l.map((x) => (x.id === it.id ? { ...x, d: v } : x)));
                   }}
@@ -76,12 +76,14 @@ export default function RightRail({ p }: { p: Planner }) {
             </div>
             <label className="lbl">
               Opening width, cm
-              <input
-                className="field field--num" type="number" step={5} value={op.len}
-                onChange={(e) => {
-                  const v = Math.max(20, +e.target.value || 20);
+              <NumField
+                step={5} value={op.len} min={20}
+                max={op.wall === "n" || op.wall === "s" ? p.room.w : p.room.d}
+                onCommit={(v) => {
                   p.hist();
-                  p.setOpenings((l) => l.map((x) => (x.id === op.id ? { ...x, len: v } : x)));
+                  p.setOpenings((l) =>
+                    l.map((x) => (x.id === op.id ? clampOpening(p.room, { ...x, len: v }) : x))
+                  );
                 }}
               />
             </label>
@@ -125,11 +127,9 @@ export default function RightRail({ p }: { p: Planner }) {
         )}
         <label className="lbl" data-noprint style={{ marginTop: 4 }}>
           Walkway, cm
-          <input
-            className="field field--num" type="number" min={40} max={120} step={5} value={settings.walkwayCm}
-            onChange={(e) =>
-              p.setSettings((s) => ({ ...s, walkwayCm: Math.max(40, Math.min(120, +e.target.value || 40)) }))
-            }
+          <NumField
+            step={5} value={settings.walkwayCm} min={40} max={120}
+            onCommit={(v) => p.setSettings((s) => ({ ...s, walkwayCm: v }))}
           />
         </label>
       </section>

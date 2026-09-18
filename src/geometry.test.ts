@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { box, cutRects, doorZone, floorArea, foot, inter, issueList, snapMove } from "./geometry";
+import { box, clampOpening, cutRects, doorZone, fitRoom, floorArea, foot, inter, issueList, snapMove } from "./geometry";
 import type { Item, Room } from "./types";
 
 const item = (o: Partial<Item>): Item =>
@@ -69,11 +69,36 @@ describe("snapMove", () => {
   it("pins to a wall within 14 cm", () => expect(snapMove(r, pc, 60, 150).x).toBe(50));
   it("leaves the piece alone beyond 14 cm", () => expect(snapMove(r, pc, 70, 150).x).toBe(70));
   it("skips wall snapping when asked", () => expect(snapMove(r, pc, 60, 150, false).x).toBe(60));
+  it("keeps 1 cm positions when snapping is off, so Shift-nudge works", () => {
+    expect(snapMove(r, pc, 101, 152, false)).toMatchObject({ x: 101, y: 152 });
+  });
   it("clamps the footprint inside the floor", () => {
     expect(snapMove(r, pc, 900, -400)).toMatchObject({ x: 350, y: 25 });
   });
   it("clamps the rotated footprint", () => {
     expect(snapMove(r, item({ w: 100, d: 50, r: 90 }), 900, 900)).toMatchObject({ x: 375, y: 250 });
+  });
+});
+
+describe("clampOpening", () => {
+  const r = room(); // 400 × 300
+  it("caps the length at the wall span", () => {
+    expect(clampOpening(r, { id: 1, kind: "Door", wall: "e", pos: 0, len: 500 })).toMatchObject({ len: 300, pos: 0 });
+  });
+  it("pulls the opening back inside the wall", () => {
+    expect(clampOpening(r, { id: 1, kind: "Door", wall: "n", pos: 350, len: 90 })).toMatchObject({ pos: 310, len: 90 });
+  });
+});
+
+describe("fitRoom", () => {
+  it("re-fits openings and corner cuts when the room shrinks", () => {
+    const r = room({
+      cuts: { nw: { w: 300, d: 100 } },
+      openings: [{ id: 1, kind: "Door", wall: "n", pos: 300, len: 90 }]
+    });
+    const next = fitRoom(r, 200, 300);
+    expect(next.openings).toEqual([{ id: 1, kind: "Door", wall: "n", pos: 110, len: 90 }]);
+    expect(next.cuts).toEqual({ nw: { w: 190, d: 100 } });
   });
 });
 
@@ -93,6 +118,16 @@ describe("issueList", () => {
       item({ id: 1, name: "Rug", cat: "soft", x: 100, y: 100 }),
       item({ id: 2, name: "Desk", x: 120, y: 100 })
     ], walk);
+    expect(issues).toEqual([]);
+  });
+
+  it("flags a piece poking outside the room walls", () => {
+    const issues = issueList(room(), [item({ id: 1, name: "Closet", w: 100, d: 50, x: 380, y: 100 })], walk);
+    expect(issues).toContainEqual({ bad: true, ids: [1], text: "Closet sits outside the floor" });
+  });
+
+  it("tolerates a 1 cm overhang, like inter does", () => {
+    const issues = issueList(room(), [item({ id: 1, name: "Closet", w: 100, d: 50, x: 350.5, y: 100 })], walk);
     expect(issues).toEqual([]);
   });
 

@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { encodeDoc, isDoc, loadDoc, newRoom, saveDoc } from "./doc";
-import { floorArea, issueList, snapMove } from "./geometry";
+import { clampOpening, floorArea, issueList, snapMove } from "./geometry";
 import type { Cat, Doc, Home, Item, Opening, Room, Sel, Settings, SlotKey, Wall } from "./types";
 
 const SLOTS: SlotKey[] = ["A", "B", "C"];
 const HISTORY_MAX = 80;
 
-const mapHome = (d: Doc, hi: number, fn: (h: Home) => Partial<Home>): Doc => ({
-  ...d,
-  homes: d.homes.map((h, i) => (i === hi ? { ...h, ...fn(h) } : h))
-});
+/* Indices are clamped exactly like the reads, so a stale hi/ri after undo or import
+   still writes to the home/room the user is looking at. */
+const mapHome = (d: Doc, hi: number, fn: (h: Home) => Partial<Home>): Doc => {
+  const i0 = Math.min(hi, d.homes.length - 1);
+  return { ...d, homes: d.homes.map((h, i) => (i === i0 ? { ...h, ...fn(h) } : h)) };
+};
 
 const mapRoom = (d: Doc, hi: number, ri: number, fn: (r: Room) => Partial<Room>): Doc =>
-  mapHome(d, hi, (h) => ({ rooms: h.rooms.map((r, i) => (i === ri ? { ...r, ...fn(r) } : r)) }));
+  mapHome(d, hi, (h) => {
+    const i0 = Math.min(ri, h.rooms.length - 1);
+    return { rooms: h.rooms.map((r, i) => (i === i0 ? { ...r, ...fn(r) } : r)) };
+  });
 
 export function usePlanner(): Planner {
   const [initial] = useState(loadDoc);
@@ -41,30 +46,39 @@ export function usePlanner(): Planner {
   const room = home.rooms[Math.min(ri, home.rooms.length - 1)];
   const items = room.slots[slot] ?? [];
 
-  /* ---- history: one snapshot per gesture, pushed before the change ---- */
+  /* ---- history: one snapshot per gesture, pushed before the change ----
+     The stacks live in refs and are mirrored to state for canUndo/canRedo; updater
+     functions stay pure, which StrictMode's double-invoking requires. */
+  const pastRef = useRef(past);
+  const futureRef = useRef(future);
+
   const hist = useCallback(() => {
-    setPast((p) => [...p, JSON.stringify(docRef.current)].slice(-HISTORY_MAX));
+    pastRef.current = [...pastRef.current, JSON.stringify(docRef.current)].slice(-HISTORY_MAX);
+    futureRef.current = [];
+    setPast(pastRef.current);
     setFuture([]);
   }, []);
 
   const undo = useCallback(() => {
-    setPast((p) => {
-      if (!p.length) return p;
-      setFuture((f) => [...f, JSON.stringify(docRef.current)]);
-      setDocState(JSON.parse(p[p.length - 1]));
-      setSel(null);
-      return p.slice(0, -1);
-    });
+    if (!pastRef.current.length) return;
+    const snap = pastRef.current[pastRef.current.length - 1];
+    futureRef.current = [...futureRef.current, JSON.stringify(docRef.current)];
+    pastRef.current = pastRef.current.slice(0, -1);
+    setPast(pastRef.current);
+    setFuture(futureRef.current);
+    setDocState(JSON.parse(snap));
+    setSel(null);
   }, []);
 
   const redo = useCallback(() => {
-    setFuture((f) => {
-      if (!f.length) return f;
-      setPast((p) => [...p, JSON.stringify(docRef.current)].slice(-HISTORY_MAX));
-      setDocState(JSON.parse(f[f.length - 1]));
-      setSel(null);
-      return f.slice(0, -1);
-    });
+    if (!futureRef.current.length) return;
+    const snap = futureRef.current[futureRef.current.length - 1];
+    pastRef.current = [...pastRef.current, JSON.stringify(docRef.current)].slice(-HISTORY_MAX);
+    futureRef.current = futureRef.current.slice(0, -1);
+    setPast(pastRef.current);
+    setFuture(futureRef.current);
+    setDocState(JSON.parse(snap));
+    setSel(null);
   }, []);
 
   /* ---- mutations ---- */
@@ -218,13 +232,12 @@ export function usePlanner(): Planner {
   const setWall = useCallback(
     (wall: Wall) => {
       if (!selOpening) return;
-      const span = wall === "n" || wall === "s" ? room.w : room.d;
       hist();
       setOpenings((l) =>
-        l.map((x) => (x.id === selOpening.id ? { ...x, wall, pos: Math.min(x.pos, Math.max(0, span - x.len)) } : x))
+        l.map((x) => (x.id === selOpening.id ? clampOpening(roomRef.current, { ...x, wall }) : x))
       );
     },
-    [selOpening, room.w, room.d, hist, setOpenings]
+    [selOpening, hist, setOpenings]
   );
 
   /* ---- issues, area ---- */
@@ -249,21 +262,23 @@ export function usePlanner(): Planner {
   }, [doc]);
 
   /* ---- share, export, import ---- */
+  /* The hash only goes into the address bar as a clipboard fallback — a lingering
+     hash would resurrect this snapshot over newer autosaved edits on reload. */
   const share = useCallback(() => {
     const hash = `#p=${encodeDoc(docRef.current)}`;
     const url = location.origin + location.pathname + hash;
-    try {
-      history.replaceState(null, "", hash);
-    } catch {
-      /* ignore */
-    }
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(url).then(
-        () => setShareLabel("Link copied"),
-        () => setShareLabel("Link in address bar")
-      );
-    } else {
+    const inBar = () => {
+      try {
+        history.replaceState(null, "", hash);
+      } catch {
+        /* ignore */
+      }
       setShareLabel("Link in address bar");
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(() => setShareLabel("Link copied"), inBar);
+    } else {
+      inBar();
     }
   }, []);
 

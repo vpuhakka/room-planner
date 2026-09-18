@@ -99,25 +99,44 @@ export function defaultDoc(): Doc {
   };
 }
 
-/** Shape check for anything arriving from a file, a URL or another browser session. */
+/** Shape check for anything arriving from a file, a URL or another browser session.
+ *  Validates every field the app dereferences, so a passing doc cannot crash or NaN the UI. */
 export function isDoc(v: unknown): v is Doc {
   const num = (x: unknown) => typeof x === "number" && Number.isFinite(x);
   const d = v as Doc;
   if (!d || typeof d !== "object" || !Array.isArray(d.homes) || !d.homes.length) return false;
-  if (!Array.isArray(d.catalog)) return false;
+  if (!Array.isArray(d.catalog) || !num(d.nextHome) || !num(d.nextRoom)) return false;
   return d.homes.every(
     (h) =>
       h &&
+      num(h.id) &&
       typeof h.name === "string" &&
       Array.isArray(h.rooms) &&
+      h.rooms.length > 0 &&
       h.rooms.every(
         (r) =>
           r &&
+          typeof r.name === "string" &&
           num(r.w) &&
           num(r.d) &&
+          num(r.nextId) &&
+          num(r.nextOid) &&
+          !!r.cuts &&
+          typeof r.cuts === "object" &&
           r.slots &&
-          (["A", "B", "C"] as const).every((k) => Array.isArray(r.slots[k])) &&
-          Array.isArray(r.openings)
+          (["A", "B", "C"] as const).every(
+            (k) =>
+              Array.isArray(r.slots[k]) &&
+              r.slots[k].every(
+                (i) =>
+                  i && num(i.id) && typeof i.name === "string" &&
+                  num(i.w) && num(i.d) && num(i.x) && num(i.y) && num(i.r)
+              )
+          ) &&
+          Array.isArray(r.openings) &&
+          r.openings.every(
+            (o) => o && num(o.id) && num(o.pos) && num(o.len) && ["n", "e", "s", "w"].includes(o.wall)
+          )
       )
   );
 }
@@ -141,13 +160,27 @@ export function decodeDoc(str: string): Doc | null {
   }
 }
 
-/** URL hash wins, then localStorage, then the default document. */
+/** A share-link hash wins once and is then consumed, so a reload goes back to the autosaved doc. */
 export function loadDoc(): { doc: Doc; note: string } {
   const hash = (location.hash || "").replace(/^#/, "");
   const m = /(?:^|&)p=([^&]+)/.exec(hash);
   if (m) {
     const shared = decodeDoc(m[1]);
-    if (shared) return { doc: shared, note: "Opened from a shared link." };
+    if (shared) {
+      try {
+        history.replaceState(null, "", location.pathname + location.search);
+      } catch {
+        /* ignore */
+      }
+      try {
+        // autosave will overwrite the stored doc shortly; keep a hand-recoverable copy
+        const prev = localStorage.getItem(STORAGE_KEY);
+        if (prev) localStorage.setItem(`${STORAGE_KEY}-backup`, prev);
+      } catch {
+        /* private browsing */
+      }
+      return { doc: shared, note: "Opened from a shared link." };
+    }
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);

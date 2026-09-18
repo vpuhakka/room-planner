@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { CATS, catMeta } from "../doc";
+import { fitRoom } from "../geometry";
+import NumField from "./NumField";
 import type { Planner } from "../usePlanner";
 import type { Cat, CornerKey } from "../types";
 
@@ -15,9 +17,7 @@ export default function LeftRail({ p }: { p: Planner }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: "", w: "", d: "", cat: "storage" as Cat });
 
-  const setCut = (key: CornerKey, f: "w" | "d", raw: string) => {
-    const lim = (f === "w" ? room.w : room.d) - 10;
-    const v = Math.max(0, Math.min(lim, +raw || 0));
+  const setCut = (key: CornerKey, f: "w" | "d", v: number) => {
     p.hist();
     p.setRoom((r) => {
       const cuts = { ...r.cuts };
@@ -56,23 +56,21 @@ export default function LeftRail({ p }: { p: Planner }) {
         <div className="grid2">
           <label className="lbl">
             Width cm
-            <input
-              className="field field--num" type="number" step={10} value={room.w}
-              onChange={(e) => {
-                const v = Math.max(150, Math.min(2000, +e.target.value || 150));
+            <NumField
+              step={10} value={room.w} min={150} max={2000}
+              onCommit={(v) => {
                 p.hist();
-                p.setRoom(() => ({ w: v }));
+                p.setRoom((r) => fitRoom(r, v, r.d));
               }}
             />
           </label>
           <label className="lbl">
             Depth cm
-            <input
-              className="field field--num" type="number" step={10} value={room.d}
-              onChange={(e) => {
-                const v = Math.max(150, Math.min(2000, +e.target.value || 150));
+            <NumField
+              step={10} value={room.d} min={150} max={2000}
+              onCommit={(v) => {
                 p.hist();
-                p.setRoom(() => ({ d: v }));
+                p.setRoom((r) => fitRoom(r, r.w, v));
               }}
             />
           </label>
@@ -100,14 +98,16 @@ export default function LeftRail({ p }: { p: Planner }) {
           return (
             <div className="corner-row" key={key}>
               <span>{label}</span>
-              <input
-                className="field field--corner" type="number" step={10} placeholder="w"
-                value={c?.w || ""} onChange={(e) => setCut(key, "w", e.target.value)}
+              <NumField
+                className="field field--corner" step={10} placeholder="w"
+                value={c?.w || 0} min={0} max={room.w - 10}
+                onCommit={(v) => setCut(key, "w", v)}
                 aria-label={`${label} cut width`}
               />
-              <input
-                className="field field--corner" type="number" step={10} placeholder="d"
-                value={c?.d || ""} onChange={(e) => setCut(key, "d", e.target.value)}
+              <NumField
+                className="field field--corner" step={10} placeholder="d"
+                value={c?.d || 0} min={0} max={room.d - 10}
+                onCommit={(v) => setCut(key, "d", v)}
                 aria-label={`${label} cut depth`}
               />
               <button

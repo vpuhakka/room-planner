@@ -80,7 +80,7 @@ export default function App() {
           <Plan p={p} />
           <p className="help" data-noprint>
             Drag pieces, or drag empty space to pan. Scroll to zoom. Alt ignores wall snapping.
-            Arrows nudge 5 cm, R rotates, Backspace removes, ⌘Z undoes.
+            Arrows nudge 5 cm (Shift for 1 cm), R rotates, Backspace removes, ⌘Z undoes.
           </p>
         </main>
         <RightRail p={p} />

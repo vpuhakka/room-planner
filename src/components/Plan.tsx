@@ -17,6 +17,7 @@ export default function Plan({ p }: { p: Planner }) {
 
   /* cm per px is read fresh from the live room box, so drag is correct at any zoom */
   const drag = (e: React.PointerEvent, o: Item | Opening, kind: "item" | "opening") => {
+    if (e.button !== 0) return;
     e.stopPropagation();
     const el = e.currentTarget as HTMLElement;
     const host = el.parentElement;
@@ -25,18 +26,33 @@ export default function Plan({ p }: { p: Planner }) {
     const sx = e.clientX;
     const sy = e.clientY;
     el.setPointerCapture(e.pointerId);
-    p.hist();
+
+    /* one snapshot per real gesture, pushed before the first move — a bare
+       selection click must not touch the history or the redo stack */
+    let started = false;
+    const begin = (ev: PointerEvent) => {
+      if (!started) {
+        if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 4) return false;
+        started = true;
+        p.hist();
+      }
+      return true;
+    };
 
     let mv: (ev: PointerEvent) => void;
     if (kind === "item") {
       const it = o as Item;
       p.setSel({ t: "item", id: it.id });
-      mv = (ev) => p.move(it.id, it.x + (ev.clientX - sx) / k, it.y + (ev.clientY - sy) / k, !ev.altKey);
+      mv = (ev) => {
+        if (!begin(ev)) return;
+        p.move(it.id, it.x + (ev.clientX - sx) / k, it.y + (ev.clientY - sy) / k, !ev.altKey);
+      };
     } else {
       const op = o as Opening;
       p.setSel({ t: "opening", id: op.id });
       const horiz = op.wall === "n" || op.wall === "s";
       mv = (ev) => {
+        if (!begin(ev)) return;
         const span = horiz ? room.w : room.d;
         const dd = (horiz ? ev.clientX - sx : ev.clientY - sy) / k;
         const np = Math.min(Math.max(Math.round((op.pos + dd) / 5) * 5, 0), Math.max(0, span - op.len));
@@ -46,12 +62,15 @@ export default function Plan({ p }: { p: Planner }) {
     const up = () => {
       el.removeEventListener("pointermove", mv);
       el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
     };
     el.addEventListener("pointermove", mv);
     el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
   };
 
   const pan = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
     const sx = e.clientX;
     const sy = e.clientY;
     const { panx, pany } = p.view;
@@ -63,13 +82,15 @@ export default function Plan({ p }: { p: Planner }) {
       moved = true;
       p.setView((v) => ({ ...v, panx: panx + dx, pany: pany + dy }));
     };
-    const up = () => {
+    const up = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", mv);
       window.removeEventListener("pointerup", up);
-      if (!moved) p.setSel(null);
+      window.removeEventListener("pointercancel", up);
+      if (!moved && ev.type === "pointerup") p.setSel(null);
     };
     window.addEventListener("pointermove", mv);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   };
 
   return (
