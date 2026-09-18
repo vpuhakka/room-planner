@@ -75,6 +75,9 @@ describe("snapMove", () => {
   it("clamps the footprint inside the floor", () => {
     expect(snapMove(r, pc, 900, -400)).toMatchObject({ x: 350, y: 25 });
   });
+  it("rounds to a custom grid step for imperial", () => {
+    expect(snapMove(r, pc, 102, 150, true, 5.08).x).toBeCloseTo(101.6); // 20 × 2″
+  });
   it("clamps the rotated footprint", () => {
     expect(snapMove(r, item({ w: 100, d: 50, r: 90 }), 900, 900)).toMatchObject({ x: 375, y: 250 });
   });
@@ -99,6 +102,11 @@ describe("fitRoom", () => {
     const next = fitRoom(r, 200, 300);
     expect(next.openings).toEqual([{ id: 1, kind: "Door", wall: "n", pos: 110, len: 90 }]);
     expect(next.cuts).toEqual({ nw: { w: 190, d: 100 } });
+  });
+
+  it("never produces a negative cut in a tiny room", () => {
+    const r = room({ cuts: { nw: { w: 50, d: 50 } } });
+    expect(fitRoom(r, 8, 300).cuts).toEqual({ nw: { w: 0, d: 50 } });
   });
 });
 
@@ -153,6 +161,14 @@ describe("issueList", () => {
       item({ id: 2, name: "Closet", w: 200, d: 100, x: 150, y: 180 })
     ], walk);
     expect(issues).toContainEqual({ bad: false, ids: [1], text: "30 cm gap between Bed and Closet" });
+  });
+
+  it("formats measures through the given formatter", () => {
+    const issues = issueList(room(), [
+      item({ id: 1, name: "Bed", w: 200, d: 100, x: 150, y: 50 }),
+      item({ id: 2, name: "Closet", w: 200, d: 100, x: 150, y: 180 })
+    ], walk, (cm) => `${cm / 2.54} in`);
+    expect(issues).toContainEqual({ bad: false, ids: [1], text: expect.stringContaining("in gap between Bed and Closet") });
   });
 
   it("stays quiet when the pieces only pass at a corner", () => {

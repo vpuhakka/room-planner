@@ -1,6 +1,7 @@
 import type React from "react";
 import { catMeta } from "../doc";
 import { box, cutRects, doorZone } from "../geometry";
+import { fmtLen, fmtNum, stepCm } from "../units";
 import type { Planner } from "../usePlanner";
 import type { Item, Opening } from "../types";
 
@@ -51,11 +52,12 @@ export default function Plan({ p }: { p: Planner }) {
       const op = o as Opening;
       p.setSel({ t: "opening", id: op.id });
       const horiz = op.wall === "n" || op.wall === "s";
+      const gs = stepCm(settings.units);
       mv = (ev) => {
         if (!begin(ev)) return;
         const span = horiz ? room.w : room.d;
         const dd = (horiz ? ev.clientX - sx : ev.clientY - sy) / k;
-        const np = Math.min(Math.max(Math.round((op.pos + dd) / 5) * 5, 0), Math.max(0, span - op.len));
+        const np = Math.min(Math.max(Math.round((op.pos + dd) / gs) * gs, 0), Math.max(0, span - op.len));
         p.setOpenings((l) => l.map((x) => (x.id === op.id ? { ...x, pos: np } : x)));
       };
     }
@@ -169,7 +171,7 @@ export default function Plan({ p }: { p: Planner }) {
                   className="dims"
                   style={{ display: !settings.showDims || b.h < 60 || b.w < 80 ? "none" : "block" }}
                 >
-                  {i.w} × {i.d}
+                  {fmtNum(i.w, settings.units)} × {fmtNum(i.d, settings.units)}
                 </span>
               </div>
             );
@@ -202,7 +204,7 @@ export default function Plan({ p }: { p: Planner }) {
               <div
                 key={`op-${o.id}`}
                 className="opening"
-                title={`${o.kind} ${o.len} cm — drag along the wall`}
+                title={`${o.kind} ${fmtLen(o.len, settings.units)} — drag along the wall`}
                 onPointerDown={(e) => drag(e, o, "opening")}
                 style={style}
               />
@@ -223,8 +225,8 @@ export default function Plan({ p }: { p: Planner }) {
             return <div key={c.key} className="cut" style={style} />;
           })}
 
-          <div className="dim-label dim-label--w">{room.w} cm</div>
-          <div className="dim-label dim-label--d">{room.d} cm</div>
+          <div className="dim-label dim-label--w">{fmtLen(room.w, settings.units)}</div>
+          <div className="dim-label dim-label--d">{fmtLen(room.d, settings.units)}</div>
         </div>
       </div>
     </div>

@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { encodeDoc, isDoc, loadDoc, newRoom, saveDoc } from "./doc";
 import { clampOpening, floorArea, issueList, snapMove } from "./geometry";
+import { fmtLen, stepCm } from "./units";
 import type { Cat, Doc, Home, Item, Opening, Room, Sel, Settings, SlotKey, Wall } from "./types";
 
 const SLOTS: SlotKey[] = ["A", "B", "C"];
 const HISTORY_MAX = 80;
+/* per-user preference, deliberately outside the doc so shared links open in the viewer's units */
+const UNITS_KEY = "room-planner-units";
 
 /* Indices are clamped exactly like the reads, so a stale hi/ri after undo or import
    still writes to the home/room the user is looking at. */
@@ -28,12 +31,21 @@ export function usePlanner(): Planner {
   const [slot, setSlotState] = useState<SlotKey>("A");
   const [sel, setSel] = useState<Sel>(null);
   const [view, setView] = useState({ zoom: 1, panx: 0, pany: 0 });
-  const [settings, setSettings] = useState<Settings>({
-    showGrid: true,
-    gridCm: 50,
-    showDims: true,
-    typeFills: true,
-    walkwayCm: 60
+  const [settings, setSettings] = useState<Settings>(() => {
+    let units: Settings["units"] = "metric";
+    try {
+      if (localStorage.getItem(UNITS_KEY) === "imperial") units = "imperial";
+    } catch {
+      /* private browsing */
+    }
+    return {
+      showGrid: true,
+      gridCm: units === "imperial" ? 60.96 : 50,
+      showDims: true,
+      typeFills: true,
+      walkwayCm: 60,
+      units
+    };
   });
   const [past, setPast] = useState<string[]>([]);
   const [future, setFuture] = useState<string[]>([]);
@@ -107,9 +119,11 @@ export function usePlanner(): Planner {
   const move = useCallback(
     (id: number, x: number, y: number, snap = true) =>
       setItems((list) =>
-        list.map((it) => (it.id === id ? { ...it, ...snapMove(roomRef.current, it, x, y, snap) } : it))
+        list.map((it) =>
+          it.id === id ? { ...it, ...snapMove(roomRef.current, it, x, y, snap, stepCm(settings.units)) } : it
+        )
       ),
-    [setItems]
+    [setItems, settings.units]
   );
 
   const rotate = useCallback(() => {
@@ -242,8 +256,8 @@ export function usePlanner(): Planner {
 
   /* ---- issues, area ---- */
   const issues = useMemo(
-    () => issueList(room, items, settings.walkwayCm),
-    [room, items, settings.walkwayCm]
+    () => issueList(room, items, settings.walkwayCm, (cm) => fmtLen(cm, settings.units)),
+    [room, items, settings.walkwayCm, settings.units]
   );
   const flagged = useMemo(() => {
     const m: Record<number, "bad" | "note"> = {};
@@ -260,6 +274,14 @@ export function usePlanner(): Planner {
     setShareLabel("Share link");
     return () => clearTimeout(t);
   }, [doc]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(UNITS_KEY, settings.units);
+    } catch {
+      /* private browsing */
+    }
+  }, [settings.units]);
 
   /* ---- share, export, import ---- */
   /* The hash only goes into the address bar as a clipboard fallback — a lingering

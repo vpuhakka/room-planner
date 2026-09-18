@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { CATS, catMeta } from "../doc";
 import { fitRoom } from "../geometry";
+import { fmtLen, fmtNum, parseLen, unitLabel } from "../units";
 import NumField from "./NumField";
 import type { Planner } from "../usePlanner";
-import type { Cat, CornerKey } from "../types";
+import type { Cat, CornerKey, Settings } from "../types";
 
 const CORNERS: [CornerKey, string][] = [
   ["nw", "Top left"],
@@ -30,8 +31,8 @@ export default function LeftRail({ p }: { p: Planner }) {
   };
 
   const addToCatalog = () => {
-    const w = +form.w;
-    const d = +form.d;
+    const w = parseLen(form.w, settings.units) ?? 0;
+    const d = parseLen(form.d, settings.units) ?? 0;
     if (!(w > 0 && d > 0)) return;
     p.hist();
     p.setDoc((dd) => ({
@@ -55,9 +56,9 @@ export default function LeftRail({ p }: { p: Planner }) {
         />
         <div className="grid2">
           <label className="lbl">
-            Width cm
+            Width {unitLabel(settings.units)}
             <NumField
-              step={10} value={room.w} min={150} max={2000}
+              step={10} value={room.w} min={1} max={2000} units={settings.units}
               onCommit={(v) => {
                 p.hist();
                 p.setRoom((r) => fitRoom(r, v, r.d));
@@ -65,9 +66,9 @@ export default function LeftRail({ p }: { p: Planner }) {
             />
           </label>
           <label className="lbl">
-            Depth cm
+            Depth {unitLabel(settings.units)}
             <NumField
-              step={10} value={room.d} min={150} max={2000}
+              step={10} value={room.d} min={1} max={2000} units={settings.units}
               onCommit={(v) => {
                 p.hist();
                 p.setRoom((r) => fitRoom(r, r.w, v));
@@ -100,13 +101,13 @@ export default function LeftRail({ p }: { p: Planner }) {
               <span>{label}</span>
               <NumField
                 className="field field--corner" step={10} placeholder="w"
-                value={c?.w || 0} min={0} max={room.w - 10}
+                value={c?.w || 0} min={0} max={Math.max(0, room.w - 10)} units={settings.units}
                 onCommit={(v) => setCut(key, "w", v)}
                 aria-label={`${label} cut width`}
               />
               <NumField
                 className="field field--corner" step={10} placeholder="d"
-                value={c?.d || 0} min={0} max={room.d - 10}
+                value={c?.d || 0} min={0} max={Math.max(0, room.d - 10)} units={settings.units}
                 onCommit={(v) => setCut(key, "d", v)}
                 aria-label={`${label} cut depth`}
               />
@@ -144,7 +145,7 @@ export default function LeftRail({ p }: { p: Planner }) {
                 />
                 <span className="name">{c.name}</span>
                 <span style={{ flex: 1 }} />
-                <span className="dims">{c.w} × {c.d}</span>
+                <span className="dims">{fmtNum(c.w, settings.units)} × {fmtNum(c.d, settings.units)}</span>
               </button>
               {editing && (
                 <button
@@ -166,11 +167,13 @@ export default function LeftRail({ p }: { p: Planner }) {
             />
             <div className="grid2" style={{ gap: 4 }}>
               <input
-                className="field field--quiet" style={{ fontFamily: "var(--mono)" }} type="number"
+                className="field field--quiet" style={{ fontFamily: "var(--mono)" }}
+                type={settings.units === "imperial" ? "text" : "number"}
                 placeholder="w" value={form.w} onChange={(e) => setForm({ ...form, w: e.target.value })}
               />
               <input
-                className="field field--quiet" style={{ fontFamily: "var(--mono)" }} type="number"
+                className="field field--quiet" style={{ fontFamily: "var(--mono)" }}
+                type={settings.units === "imperial" ? "text" : "number"}
                 placeholder="d" value={form.d} onChange={(e) => setForm({ ...form, d: e.target.value })}
               />
             </div>
@@ -199,6 +202,17 @@ export default function LeftRail({ p }: { p: Planner }) {
 
       <section className="sec">
         <h2>Plan view</h2>
+        <select
+          className="field field--quiet" value={settings.units}
+          onChange={(e) => {
+            const units = e.target.value as Settings["units"];
+            p.setSettings((s) => ({ ...s, units, gridCm: units === "imperial" ? 60.96 : 50 }));
+          }}
+          aria-label="Units"
+        >
+          <option value="metric">Centimetres</option>
+          <option value="imperial">Feet &amp; inches</option>
+        </select>
         <label className="check">
           <input
             type="checkbox" checked={settings.showGrid}
@@ -211,8 +225,8 @@ export default function LeftRail({ p }: { p: Planner }) {
           onChange={(e) => p.setSettings((s) => ({ ...s, gridCm: +e.target.value }))}
           aria-label="Grid size"
         >
-          {[10, 25, 50, 100].map((g) => (
-            <option key={g} value={g}>{g} cm grid</option>
+          {(settings.units === "imperial" ? [15.24, 30.48, 60.96, 121.92] : [10, 25, 50, 100]).map((g) => (
+            <option key={g} value={g}>{fmtLen(g, settings.units)} grid</option>
           ))}
         </select>
         <label className="check">

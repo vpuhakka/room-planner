@@ -1,4 +1,5 @@
 import { clampOpening } from "../geometry";
+import { fmtArea, fmtLen, fmtNum, unitLabel } from "../units";
 import NumField from "./NumField";
 import type { Planner } from "../usePlanner";
 import type { Wall } from "../types";
@@ -12,7 +13,8 @@ const WALLS: [Wall, string][] = [
 
 export default function RightRail({ p }: { p: Planner }) {
   const { selItem: it, selOpening: op, items, issues, settings } = p;
-  const areaText = `${(p.areaCm2 / 10000).toFixed(1)} m²`;
+  const u = settings.units;
+  const areaText = fmtArea(p.areaCm2, u);
   const fillText = p.areaCm2 > 0 ? `${Math.round((p.takenCm2 / p.areaCm2) * 100)}%` : "—";
 
   return (
@@ -30,7 +32,7 @@ export default function RightRail({ p }: { p: Planner }) {
               <label className="lbl">
                 Width
                 <NumField
-                  step={5} value={it.w} min={10}
+                  step={5} value={it.w} min={10} units={u}
                   onCommit={(v) => {
                     p.hist();
                     p.setItems((l) => l.map((x) => (x.id === it.id ? { ...x, w: v } : x)));
@@ -40,7 +42,7 @@ export default function RightRail({ p }: { p: Planner }) {
               <label className="lbl">
                 Depth
                 <NumField
-                  step={5} value={it.d} min={10}
+                  step={5} value={it.d} min={10} units={u}
                   onCommit={(v) => {
                     p.hist();
                     p.setItems((l) => l.map((x) => (x.id === it.id ? { ...x, d: v } : x)));
@@ -75,9 +77,9 @@ export default function RightRail({ p }: { p: Planner }) {
               </div>
             </div>
             <label className="lbl">
-              Opening width, cm
+              Opening width, {unitLabel(u)}
               <NumField
-                step={5} value={op.len} min={20}
+                step={5} value={op.len} min={20} units={u}
                 max={op.wall === "n" || op.wall === "s" ? p.room.w : p.room.d}
                 onCommit={(v) => {
                   p.hist();
@@ -122,13 +124,13 @@ export default function RightRail({ p }: { p: Planner }) {
         ))}
         {issues.length === 0 && (
           <p style={{ margin: 0, fontSize: 11, lineHeight: 1.45, color: "var(--mute)" }}>
-            Nothing overlaps, the door swings free and walkways are at least {settings.walkwayCm} cm.
+            Nothing overlaps, the door swings free and walkways are at least {fmtLen(settings.walkwayCm, u)}.
           </p>
         )}
         <label className="lbl" data-noprint style={{ marginTop: 4 }}>
-          Walkway, cm
+          Walkway, {unitLabel(u)}
           <NumField
-            step={5} value={settings.walkwayCm} min={40} max={120}
+            step={5} value={settings.walkwayCm} min={40} max={120} units={u}
             onCommit={(v) => p.setSettings((s) => ({ ...s, walkwayCm: v }))}
           />
         </label>
@@ -142,7 +144,7 @@ export default function RightRail({ p }: { p: Planner }) {
             onClick={() => p.setSel({ t: "item", id: i.id })}
           >
             <span className="name">{i.name}</span>
-            <span className="dims">{i.w} × {i.d} cm</span>
+            <span className="dims">{fmtNum(i.w, u)} × {fmtLen(i.d, u)}</span>
           </button>
         ))}
         <p className="note-mono" style={{ marginTop: 4 }}>

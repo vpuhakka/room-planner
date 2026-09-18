@@ -4,7 +4,7 @@ import LeftRail from "./components/LeftRail";
 import Plan from "./components/Plan";
 import RightRail from "./components/RightRail";
 import Toolbar from "./components/Toolbar";
-import { floorArea } from "./geometry";
+import { fineStepCm, fmtArea, fmtLen, fmtNum, stepCm } from "./units";
 import { usePlanner } from "./usePlanner";
 
 export default function App() {
@@ -45,7 +45,7 @@ export default function App() {
         return p.del();
       }
       if (!selItem) return;
-      const step = e.shiftKey ? 1 : 5;
+      const step = e.shiftKey ? fineStepCm(p.settings.units) : stepCm(p.settings.units);
       const nudge: Record<string, [number, number]> = {
         ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step]
       };
@@ -74,13 +74,14 @@ export default function App() {
               {p.home.name} — {p.room.name}, layout {p.slot}
             </p>
             <p style={{ margin: "2px 0 0", fontFamily: "var(--mono)", fontSize: 11, color: "var(--mute)" }}>
-              {p.room.w} × {p.room.d} cm · {(floorArea(p.room) / 10000).toFixed(1)} m²
+              {fmtNum(p.room.w, p.settings.units)} × {fmtLen(p.room.d, p.settings.units)} · {fmtArea(p.areaCm2, p.settings.units)}
             </p>
           </div>
           <Plan p={p} />
           <p className="help" data-noprint>
             Drag pieces, or drag empty space to pan. Scroll to zoom. Alt ignores wall snapping.
-            Arrows nudge 5 cm (Shift for 1 cm), R rotates, Backspace removes, ⌘Z undoes.
+            Arrows nudge {fmtLen(stepCm(p.settings.units), p.settings.units)} (Shift
+            for {fmtLen(fineStepCm(p.settings.units), p.settings.units)}), R rotates, Backspace removes, ⌘Z undoes.
           </p>
         </main>
         <RightRail p={p} />

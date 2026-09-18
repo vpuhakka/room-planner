@@ -59,12 +59,15 @@ export interface Doc {
   homes: Home[];
 }
 
+export type Units = "metric" | "imperial";
+
 export interface Settings {
   showGrid: boolean;
   gridCm: number;
   showDims: boolean;
   typeFills: boolean;
   walkwayCm: number;
+  units: Units;
 }
 
 export type Sel = { t: "item" | "opening"; id: number } | null;

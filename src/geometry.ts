@@ -40,15 +40,15 @@ export function doorZone(room: Room, d: Opening, depth?: number): Rect {
   return { x0: room.w - t, y0: d.pos, x1: room.w, y1: d.pos + L };
 }
 
-/** Snap to 5 cm and wall-snap within 14 cm unless suppressed, then clamp inside the floor.
- *  snap=false leaves positions as given, so Alt-drag and the 1 cm Shift-nudge stay fine-grained. */
-export function snapMove(room: Room, it: Item, x: number, y: number, snap = true): { x: number; y: number } {
+/** Snap to the grid step (5 cm or 2″) and wall-snap within 14 cm unless suppressed, then clamp
+ *  inside the floor. snap=false leaves positions as given, so Alt-drag and Shift-nudge stay fine. */
+export function snapMove(room: Room, it: Item, x: number, y: number, snap = true, step = 5): { x: number; y: number } {
   const [w, h] = foot(it);
   let nx = x;
   let ny = y;
   if (snap) {
-    nx = Math.round(nx / 5) * 5;
-    ny = Math.round(ny / 5) * 5;
+    nx = Math.round(nx / step) * step;
+    ny = Math.round(ny / step) * step;
     if (Math.abs(nx - w / 2) < 14) nx = w / 2;
     if (Math.abs(room.w - nx - w / 2) < 14) nx = room.w - w / 2;
     if (Math.abs(ny - h / 2) < 14) ny = h / 2;
@@ -72,7 +72,7 @@ export function fitRoom(room: Room, w: number, d: number): Partial<Room> {
   const cuts: Room["cuts"] = {};
   for (const k of Object.keys(room.cuts) as CornerKey[]) {
     const c = room.cuts[k]!;
-    cuts[k] = { w: Math.min(c.w, w - 10), d: Math.min(c.d, d - 10) };
+    cuts[k] = { w: Math.max(0, Math.min(c.w, w - 10)), d: Math.max(0, Math.min(c.d, d - 10)) };
   }
   return { w, d, cuts, openings: room.openings.map((o) => clampOpening(next, o)) };
 }
@@ -82,8 +82,14 @@ export function floorArea(room: Room): number {
   return room.w * room.d - cutRects(room).reduce((a, c) => a + (c.x1 - c.x0) * (c.y1 - c.y0), 0);
 }
 
-/** Rugs sit under things, so they are excluded from every check. */
-export function issueList(room: Room, items: Item[], walkwayCm: number): Issue[] {
+/** Rugs sit under things, so they are excluded from every check.
+ *  fmt renders measures in the user's units; issues stay deduplicated by their text. */
+export function issueList(
+  room: Room,
+  items: Item[],
+  walkwayCm: number,
+  fmt: (cm: number) => string = (cm) => `${Math.round(cm)} cm`
+): Issue[] {
   const list = items.map((i) => ({ i, b: box(i) }));
   const solid = list.filter((x) => x.i.cat !== "soft");
   const out: Issue[] = [];
@@ -114,7 +120,7 @@ export function issueList(room: Room, items: Item[], walkwayCm: number): Issue[]
     for (const x of solid) {
       if (inter(x.b, swing)) out.push({ bad: true, ids: [x.i.id], text: `${x.i.name} blocks the door swing` });
       else if (inter(x.b, approach)) {
-        out.push({ bad: false, ids: [x.i.id], text: `${x.i.name} leaves under ${walkwayCm} cm at the door` });
+        out.push({ bad: false, ids: [x.i.id], text: `${x.i.name} leaves under ${fmt(walkwayCm)} at the door` });
       }
     }
   }
@@ -135,7 +141,7 @@ export function issueList(room: Room, items: Item[], walkwayCm: number): Issue[]
         out.push({
           bad: false,
           ids: [solid[a].i.id],
-          text: `${Math.round(g)} cm gap between ${solid[a].i.name} and ${solid[b].i.name}`
+          text: `${fmt(g)} gap between ${solid[a].i.name} and ${solid[b].i.name}`
         });
       }
     }
